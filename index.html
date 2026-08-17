@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบนิเทศภายในโรงเรียนตากใบ</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" href="https://img1.pic.in.th/images/image7b802090b2af97e8.png" type="image/png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="loginScreen" class="login-screen">
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-logo">
+                <img src="https://img1.pic.in.th/images/image7b802090b2af97e8.png" alt="โรงเรียนตากใบ">
+            </div>
+            <h1 class="login-title">ระบบนิเทศภายใน</h1>
+            <h2 class="login-subtitle">โรงเรียนตากใบ</h2>
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label><i class="fas fa-user"></i> ชื่อผู้ใช้</label>
+                    <input type="text" id="loginUsername" placeholder="กรอกชื่อผู้ใช้" required>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-lock"></i> รหัสผ่าน</label>
+                    <input type="password" id="loginPassword" placeholder="กรอกรหัสผ่าน" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">
+                    <i class="fas fa-sign-in-alt"></i> เข้าสู่ระบบ
+                </button>
+                <div id="loginError" class="error-msg" style="display:none;"></div>
+            </form>
+            <div class="login-hint">
+                <small><i class="fas fa-info-circle"></i> ผู้ดูแลระบบ: admin / admin123</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main App -->
+<div id="mainApp" class="main-app" style="display:none;">
+    <!-- Sidebar -->
+    <nav id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+            <img src="https://img1.pic.in.th/images/image7b802090b2af97e8.png" alt="logo" class="sidebar-logo">
+            <span class="sidebar-brand">ระบบนิเทศ<br><small>โรงเรียนตากใบ</small></span>
+        </div>
+        <ul class="sidebar-nav">
+            <li class="nav-item active" data-page="dashboard">
+                <a href="#"><i class="fas fa-tachometer-alt"></i> <span>แดชบอร์ด</span></a>
+            </li>
+            <li class="nav-item" data-page="booking">
+                <a href="#"><i class="fas fa-calendar-check"></i> <span>จองวันนิเทศ</span></a>
+            </li>
+            <li class="nav-item" data-page="files">
+                <a href="#"><i class="fas fa-cloud-upload-alt"></i> <span>ส่งงาน/ไฟล์</span></a>
+            </li>
+            <li class="nav-item" data-page="evaluation">
+                <a href="#"><i class="fas fa-clipboard-check"></i> <span>ประเมินผล</span></a>
+            </li>
+            <li class="nav-item" data-page="admin" id="navAdmin" style="display:none;">
+                <a href="#"><i class="fas fa-cog"></i> <span>ผู้ดูแลระบบ</span></a>
+            </li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <i class="fas fa-user-circle"></i>
+                <span id="currentUserName">-</span>
+            </div>
+            <button id="logoutBtn" class="btn btn-logout">
+                <i class="fas fa-sign-out-alt"></i> ออกจากระบบ
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Top Bar -->
+        <header class="topbar">
+            <button id="sidebarToggle" class="sidebar-toggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h2 id="pageTitle">แดชบอร์ด</h2>
+            <div class="topbar-actions">
+                <span id="todayDate" class="today-date"></span>
+            </div>
+        </header>
+
+        <!-- Page Content -->
+        <div class="page-content">
+
+            <!-- ==================== DASHBOARD ==================== -->
+            <section id="page-dashboard" class="page active">
+                <div class="stats-grid">
+                    <div class="stat-card stat-yellow">
+                        <div class="stat-icon"><i class="fas fa-calendar-alt"></i></div>
+                        <div class="stat-info">
+                            <h3 id="statTotalBookings">0</h3>
+                            <p>การจองทั้งหมด</p>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-red">
+                        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                        <div class="stat-info">
+                            <h3 id="statCompleted">0</h3>
+                            <p>นิเทศแล้ว</p>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-dark">
+                        <div class="stat-icon"><i class="fas fa-clock"></i></div>
+                        <div class="stat-info">
+                            <h3 id="statPending">0</h3>
+                            <p>รอดำเนินการ</p>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-yellow-light">
+                        <div class="stat-icon"><i class="fas fa-file-alt"></i></div>
+                        <div class="stat-info">
+                            <h3 id="statFiles">0</h3>
+                            <p>ไฟล์งานทั้งหมด</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="card calendar-card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-calendar"></i> ปฏิทินการนิเทศ</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="dashboardCalendar"></div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-chart-bar"></i> สถิติกลุ่มสาระ</h3>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="deptChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-list"></i> การจองล่าสุด</h3>
+                        </div>
+                        <div class="card-body table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>วันที่</th>
+                                        <th>ชื่อครู</th>
+                                        <th>กลุ่มสาระ</th>
+                                        <th>สถานะ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="latestBookings"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-folder-open"></i> สถานะส่งงานล่าสุด</h3>
+                        </div>
+                        <div class="card-body table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>วันที่</th>
+                                        <th>ชื่อครู</th>
+                                        <th>ประเภท</th>
+                                        <th>สถานะ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="latestFiles"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== BOOKING ==================== -->
+            <section id="page-booking" class="page">
+                <div class="page-header">
+                    <h2><i class="fas fa-calendar-check"></i> จองวันนิเทศ</h2>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-plus-circle"></i> แบบฟอร์มจองวันนิเทศ</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="bookingForm">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>วันที่นิเทศ <span class="required">*</span></label>
+                                        <input type="date" id="bookDate" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>ช่วงเวลา <span class="required">*</span></label>
+                                        <select id="bookTime" required>
+                                            <option value="">-- เลือกช่วงเวลา --</option>
+                                            <option value="08:30-09:30">08:30 - 09:30</option>
+                                            <option value="09:30-10:30">09:30 - 10:30</option>
+                                            <option value="10:30-11:30">10:30 - 11:30</option>
+                                            <option value="13:00-14:00">13:00 - 14:00</option>
+                                            <option value="14:00-15:00">14:00 - 15:00</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>ชื่อครูผู้สอน <span class="required">*</span></label>
+                                        <input type="text" id="bookTeacher" placeholder="กรอกชื่อ-นามสกุล" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>กลุ่มสาระ <span class="required">*</span></label>
+                                        <select id="bookDepartment" required>
+                                            <option value="">-- เลือกกลุ่มสาระ --</option>
+                                            <option value="ภาษาไทย">ภาษาไทย</option>
+                                            <option value="คณิตศาสตร์">คณิตศาสตร์</option>
+                                            <option value="วิทยาศาสตร์">วิทยาศาสตร์</option>
+                                            <option value="สังคมศึกษา">สังคมศึกษา</option>
+                                            <option value="ภาษาอังกฤษ">ภาษาอังกฤษ</option>
+                                            <option value="สุขศึกษา">สุขศึกษา</option>
+                                            <option value="ศิลปะ">ศิลปะ</option>
+                                            <option value="การงานอาชีพ">การงานอาชีพ</option>
+                                            <option value="เทคโนโลยี">เทคโนโลยี</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>คาบที่ <span class="required">*</span></label>
+                                        <select id="bookPeriod" required>
+                                            <option value="">-- เลือกคาบ --</option>
+                                            <option value="1">คาบที่ 1</option>
+                                            <option value="2">คาบที่ 2</option>
+                                            <option value="3">คาบที่ 3</option>
+                                            <option value="4">คาบที่ 4</option>
+                                            <option value="5">คาบที่ 5</option>
+                                            <option value="6">คาบที่ 6</option>
+                                            <option value="7">คาบที่ 7</option>
+                                            <option value="8">คาบที่ 8</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>ชื่อวิชา <span class="required">*</span></label>
+                                        <input type="text" id="bookSubject" placeholder="กรอกชื่อวิชา" required>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>รหัสวิชา</label>
+                                        <input type="text" id="bookSubjectCode" placeholder="กรอกรหัสวิชา">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>ระดับชั้น <span class="required">*</span></label>
+                                        <select id="bookClassLevel" required>
+                                            <option value="">-- เลือกระดับชั้น --</option>
+                                            <option value="ม.1">ม.1</option>
+                                            <option value="ม.2">ม.2</option>
+                                            <option value="ม.3">ม.3</option>
+                                            <option value="ม.4">ม.4</option>
+                                            <option value="ม.5">ม.5</option>
+                                            <option value="ม.6">ม.6</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>ห้องเรียน <span class="required">*</span></label>
+                                        <input type="text" id="bookRoom" placeholder="เช่น ห้อง 301" required>
+                                    </div>
+                                    <div class="form-group"></div>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save"></i> บันทึกการจอง
+                                    </button>
+                                    <button type="reset" class="btn btn-secondary">
+                                        <i class="fas fa-times"></i> ล้างข้อมูล
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-calendar-alt"></i> ปฏิทินการจองของฉัน</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="bookingCalendar"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-list-ul"></i> รายการจองของฉัน</h3>
+                    </div>
+                    <div class="card-body table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>วันที่นิเทศ</th>
+                                    <th>ช่วงเวลา</th>
+                                    <th>กลุ่มสาระ</th>
+                                    <th>วิชา</th>
+                                    <th>ชั้น</th>
+                                    <th>ห้อง</th>
+                                    <th>สถานะ</th>
+                                    <th>จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="myBookings"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== FILES ==================== -->
+            <section id="page-files" class="page">
+                <div class="page-header">
+                    <h2><i class="fas fa-cloud-upload-alt"></i> ส่งงาน/ไฟล์</h2>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-upload"></i> แนบไฟล์งานนิเทศ</h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="fileForm">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>ชื่อครูผู้สอน <span class="required">*</span></label>
+                                    <input type="text" id="fileTeacher" placeholder="กรอกชื่อ-นามสกุล" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>ประเภทไฟล์ <span class="required">*</span></label>
+                                    <select id="fileType" required>
+                                        <option value="">-- เลือกประเภท --</option>
+                                        <option value="แผนการสอน">แผนการสอน (PDF/Word)</option>
+                                        <option value="สื่อการสอน">สื่อการสอน (รูป/PPT/PDF)</option>
+                                        <option value="ภาพกิจกรรม">ภาพกิจกรรม (รูปภาพ)</option>
+                                        <option value="คลิปวิดีโอ">คลิปวิดีโอ (ลิงก์ YouTube/Drive)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div id="fileUploadSection" class="form-group" style="display:none;">
+                                <label>อัพโหลดไฟล์</label>
+                                <div class="upload-area" id="uploadArea">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                    <p>ลากไฟล์มาที่นี่ หรือ <span class="upload-browse">เลือกไฟล์</span></p>
+                                    <small>รองรับ: PDF, DOC, DOCX, PPT, PPTX, JPG, PNG (สูงสุด 10MB)</small>
+                                    <input type="file" id="fileInput" style="display:none;">
+                                </div>
+                                <div id="filePreview" class="file-preview" style="display:none;">
+                                    <i class="fas fa-file"></i>
+                                    <span id="fileName"></span>
+                                    <button type="button" id="removeFile" class="btn-icon"><i class="fas fa-times"></i></button>
+                                </div>
+                                <div id="uploadProgress" class="progress-bar" style="display:none;">
+                                    <div class="progress-fill" id="progressFill"></div>
+                                </div>
+                            </div>
+
+                            <div id="fileLinkSection" class="form-group" style="display:none;">
+                                <label>ลิงก์วิดีโอ <span class="required">*</span></label>
+                                <input type="url" id="fileLink" placeholder="https://www.youtube.com/... หรือ https://drive.google.com/...">
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-paper-plane"></i> ส่งไฟล์
+                                </button>
+                                <button type="reset" class="btn btn-secondary">
+                                    <i class="fas fa-times"></i> ล้างข้อมูล
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-folder-open"></i> ไฟล์งานที่ส่งแล้ว</h3>
+                    </div>
+                    <div class="card-body table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>วันที่ส่ง</th>
+                                    <th>ชื่อครู</th>
+                                    <th>ประเภท</th>
+                                    <th>ไฟล์</th>
+                                    <th>สถานะ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="myFiles"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== EVALUATION ==================== -->
+            <section id="page-evaluation" class="page">
+                <div class="page-header">
+                    <h2><i class="fas fa-clipboard-check"></i> ประเมินผลการนิเทศ</h2>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-edit"></i> แบบฟอร์มประเมินผล</h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="evaluationForm">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>ชื่อครูผู้สอน <span class="required">*</span></label>
+                                    <select id="evalTeacher" required>
+                                        <option value="">-- เลือกครูที่นิเทศ --</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>วันที่นิเทศ <span class="required">*</span></label>
+                                    <input type="date" id="evalDate" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>จุดเด่น <span class="required">*</span></label>
+                                <textarea id="evalStrengths" rows="4" placeholder="บันทึกจุดเด่นในการจัดการเรียนการสอน..." required></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>จุดพัฒนา <span class="required">*</span></label>
+                                <textarea id="evalImprovements" rows="4" placeholder="บันทึกจุดที่ควรพัฒนา..." required></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>ข้อเสนอแนะ</label>
+                                <textarea id="evalSuggestions" rows="3" placeholder="ข้อเสนอแนะเพิ่มเติม..."></textarea>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>ระดับคุณภาพ <span class="required">*</span></label>
+                                    <select id="evalSummary" required>
+                                        <option value="">-- เลือกระดับ --</option>
+                                        <option value="ดีมาก">ดีมาก</option>
+                                        <option value="ดี">ดี</option>
+                                        <option value="พอใช้">พอใช้</option>
+                                        <option value="ปรับปรุง">ปรับปรุง</option>
+                                    </select>
+                                </div>
+                                <div class="form-group"></div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> บันทึกผลการประเมิน
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-list"></i> ผลการประเมินล่าสุด</h3>
+                    </div>
+                    <div class="card-body table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>วันที่ประเมิน</th>
+                                    <th>ชื่อครู</th>
+                                    <th>วันที่นิเทศ</th>
+                                    <th>จุดเด่น</th>
+                                    <th>จุดพัฒนา</th>
+                                    <th>ระดับ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="evaluations"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== ADMIN ==================== -->
+            <section id="page-admin" class="page">
+                <div class="page-header">
+                    <h2><i class="fas fa-cog"></i> ผู้ดูแลระบบ</h2>
+                </div>
+
+                <!-- Admin Tabs -->
+                <div class="admin-tabs">
+                    <button class="tab-btn active" data-tab="admin-bookings">
+                        <i class="fas fa-calendar-check"></i> จัดการการจอง
+                    </button>
+                    <button class="tab-btn" data-tab="admin-files">
+                        <i class="fas fa-file-alt"></i> ตรวจผลงาน
+                    </button>
+                    <button class="tab-btn" data-tab="admin-evaluations">
+                        <i class="fas fa-clipboard-check"></i> ดูผลประเมิน
+                    </button>
+                    <button class="tab-btn" data-tab="admin-reports">
+                        <i class="fas fa-print"></i> พิมพ์รายงาน
+                    </button>
+                </div>
+
+                <!-- Tab: Manage Bookings -->
+                <div id="admin-bookings" class="tab-content active">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-list"></i> รายการจองทั้งหมด</h3>
+                            <div class="card-actions">
+                                <select id="adminFilterDate" class="filter-select">
+                                    <option value="">ทุกวันที่</option>
+                                </select>
+                                <select id="adminFilterStatus" class="filter-select">
+                                    <option value="">ทุกสถานะ</option>
+                                    <option value="รอดำเนินการ">รอดำเนินการ</option>
+                                    <option value="ยืนยันแล้ว">ยืนยันแล้ว</option>
+                                    <option value="ปฏิเสธ">ปฏิเสธ</option>
+                                    <option value="นิเทศแล้ว">นิเทศแล้ว</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="card-body table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>วันที่</th>
+                                        <th>เวลา</th>
+                                        <th>ชื่อครู</th>
+                                        <th>กลุ่มสาระ</th>
+                                        <th>วิชา</th>
+                                        <th>ชั้น/ห้อง</th>
+                                        <th>สถานะ</th>
+                                        <th>จัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="adminBookings"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Check Files -->
+                <div id="admin-files" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-folder-open"></i> ไฟล์งานทั้งหมด</h3>
+                        </div>
+                        <div class="card-body table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>วันที่ส่ง</th>
+                                        <th>ชื่อครู</th>
+                                        <th>ประเภท</th>
+                                        <th>ไฟล์</th>
+                                        <th>สถานะ</th>
+                                        <th>จัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="adminFiles"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: View Evaluations -->
+                <div id="admin-evaluations" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-clipboard-check"></i> ผลการประเมินทั้งหมด</h3>
+                        </div>
+                        <div class="card-body table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>วันที่ประเมิน</th>
+                                        <th>ชื่อครู</th>
+                                        <th>วันที่นิเทศ</th>
+                                        <th>จุดเด่น</th>
+                                        <th>จุดพัฒนา</th>
+                                        <th>ข้อเสนอแนะ</th>
+                                        <th>ระดับ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="adminEvaluations"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Reports -->
+                <div id="admin-reports" class="tab-content">
+                    <div class="dashboard-grid">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3><i class="fas fa-user"></i> รายงานรายบุคคล</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>เลือกครู</label>
+                                        <select id="reportTeacher">
+                                            <option value="">-- เลือกครู --</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>&nbsp;</label>
+                                        <button type="button" id="printIndividualReport" class="btn btn-primary">
+                                            <i class="fas fa-print"></i> พิมพ์รายงาน
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3><i class="fas fa-users"></i> รายงานกลุ่มสาระ</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>เลือกกลุ่มสาระ</label>
+                                        <select id="reportDepartment">
+                                            <option value="">-- เลือกกลุ่มสาระ --</option>
+                                            <option value="ภาษาไทย">ภาษาไทย</option>
+                                            <option value="คณิตศาสตร์">คณิตศาสตร์</option>
+                                            <option value="วิทยาศาสตร์">วิทยาศาสตร์</option>
+                                            <option value="สังคมศึกษา">สังคมศึกษา</option>
+                                            <option value="ภาษาอังกฤษ">ภาษาอังกฤษ</option>
+                                            <option value="สุขศึกษา">สุขศึกษา</option>
+                                            <option value="ศิลปะ">ศิลปะ</option>
+                                            <option value="การงานอาชีพ">การงานอาชีพ</option>
+                                            <option value="เทคโนโลยี">เทคโนโลยี</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>&nbsp;</label>
+                                        <button type="button" id="printDeptReport" class="btn btn-primary">
+                                            <i class="fas fa-print"></i> พิมพ์รายงาน
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card" id="reportContent" style="display:none;">
+                        <div class="card-header">
+                            <h3><i class="fas fa-file-alt"></i> รายงานผลการนิเทศ</h3>
+                        </div>
+                        <div class="card-body" id="reportBody">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </div>
+</div>
+
+<!-- Toast Notification -->
+<div id="toast" class="toast"></div>
+
+<!-- Modal -->
+<div id="modal" class="modal" style="display:none;">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">-</h3>
+            <button class="modal-close" id="modalClose"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+        <div class="modal-footer" id="modalFooter"></div>
+    </div>
+</div>
+
+<!-- Print Area (hidden) -->
+<div id="printArea" class="print-area"></div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
