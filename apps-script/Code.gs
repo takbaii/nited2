@@ -18,6 +18,8 @@ function doGet(e) {
       return jsonResponse(getEvaluations());
     case 'getDashboard':
       return jsonResponse(getDashboardData());
+    case 'setup':
+      return jsonResponse(runSetup());
     default:
       return jsonResponse({ success: true, message: 'Supervision System API is running' });
   }
@@ -413,4 +415,15 @@ function setupDriveFolders() {
   });
 
   Logger.log('Drive folder setup complete!');
+}
+
+/* ========== RUN SETUP ========== */
+function runSetup() {
+  try {
+    setupSheets();
+    setupDriveFolders();
+    return { success: true, message: 'Setup complete! Sheets and Drive folders created.' };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
 }
