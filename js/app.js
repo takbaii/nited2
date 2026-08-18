@@ -1,6 +1,6 @@
 /* ========== CONFIGURATION ========== */
 const CONFIG = {
-    SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzZZx2KlfeqWkeRpCG27Kzr3QZDI6E8fUxgwiiNAEqV04Vld30SMkiRiG1q7yuCI0kPVg/exec',
+    SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbw9XOz8E_mHczq9y7zkOCfYINC0qIjCv_TpPu4K6ErIOVgunR5bCtyv7wDSx0cZAgWO_Q/exec',
     SPREADSHEET_ID: '1e5530q7hRUdR6pNIx6tAv4JjNKadFibg7GE5ohuq4xU',
     DRIVE_FOLDER_ID: '1wVAG7EETgBcv5ftOFLLzdX-wbDEK95Dw',
     ADMIN_PASSWORD: 'admin123',
@@ -32,45 +32,80 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /* ========== API HELPER ========== */
 async function apiCall(action, data = {}) {
-    try {
+    return new Promise((resolve) => {
         const params = new URLSearchParams({ action, ...data });
         const url = `${CONFIG.SCRIPT_URL}?${params.toString()}`;
-        const response = await fetch(url, {
-            redirect: 'follow',
-            headers: { 'Accept': 'application/json' }
-        });
-        const text = await response.text();
-        try {
-            return JSON.parse(text);
-        } catch (e) {
-            console.error('Response is not JSON:', text.substring(0, 200));
-            return { success: false, error: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง' };
-        }
-    } catch (error) {
-        console.error('API Error:', error);
-        return { success: false, error: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบอินเทอร์เน็ต' };
-    }
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.setRequestHeader('Accept', 'application/json');
+        xhr.timeout = 15000;
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4) {
+                if (xhr.status === 200) {
+                    try {
+                        const result = JSON.parse(xhr.responseText);
+                        resolve(result);
+                    } catch (e) {
+                        console.error('Response is not JSON:', xhr.responseText?.substring(0, 200));
+                        resolve({ success: false, error: 'เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง' });
+                    }
+                } else {
+                    console.error('HTTP Error:', xhr.status, xhr.statusText);
+                    resolve({ success: false, error: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ (HTTP ' + xhr.status + ')' });
+                }
+            }
+        };
+
+        xhr.onerror = function() {
+            console.error('XHR Error for:', url);
+            resolve({ success: false, error: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบอินเทอร์เน็ตและ CORS' });
+        };
+
+        xhr.ontimeout = function() {
+            resolve({ success: false, error: 'หมดเวลาเชื่อมต่อ กรุณาลองใหม่' });
+        };
+
+        xhr.send();
+    });
 }
 
 async function apiPost(action, data = {}) {
-    try {
-        const response = await fetch(CONFIG.SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action, ...data }),
-            redirect: 'follow'
-        });
-        const text = await response.text();
-        try {
-            return JSON.parse(text);
-        } catch (e) {
-            console.error('Post response is not JSON:', text.substring(0, 200));
-            return { success: false, error: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง' };
-        }
-    } catch (error) {
-        console.error('API Post Error:', error);
-        return { success: false, error: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบอินเทอร์เน็ต' };
-    }
+    return new Promise((resolve) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', CONFIG.SCRIPT_URL, true);
+        xhr.setRequestHeader('Content-Type', 'text/plain;charset=utf-8');
+        xhr.timeout = 15000;
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4) {
+                if (xhr.status === 200) {
+                    try {
+                        const result = JSON.parse(xhr.responseText);
+                        resolve(result);
+                    } catch (e) {
+                        console.error('Post response is not JSON:', xhr.responseText?.substring(0, 200));
+                        resolve({ success: false, error: 'เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง' });
+                    }
+                } else {
+                    console.error('POST HTTP Error:', xhr.status, xhr.statusText);
+                    resolve({ success: false, error: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ (HTTP ' + xhr.status + ')' });
+                }
+            }
+        };
+
+        xhr.onerror = function() {
+            console.error('XHR POST Error');
+            resolve({ success: false, error: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบอินเทอร์เน็ตและ CORS' });
+        };
+
+        xhr.ontimeout = function() {
+            resolve({ success: false, error: 'หมดเวลาเชื่อมต่อ กรุณาลองใหม่' });
+        };
+
+        xhr.send(JSON.stringify({ action, ...data }));
+    });
 }
 
 /* ========== LOCAL STORAGE HELPER ========== */

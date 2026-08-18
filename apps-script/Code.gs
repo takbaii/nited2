@@ -36,48 +36,55 @@ function doGet(e) {
 }
 
 function doPost(e) {
-  try {
-    const data = JSON.parse(e.postData.contents);
-    const action = data.action;
+  let data;
 
-    switch (action) {
-      case 'addBooking':
-        return jsonResponse(addBooking(data));
-      case 'updateBookingStatus':
-        return jsonResponse(updateBookingStatus(data));
-      case 'deleteBooking':
-        return jsonResponse(deleteBooking(data));
-      case 'addFile':
-        return jsonResponse(addFile(data));
-      case 'updateFileStatus':
-        return jsonResponse(updateFileStatus(data));
-      case 'deleteFile':
-        return jsonResponse(deleteFile(data));
-      case 'updateFile':
-        return jsonResponse(updateFile(data));
-      case 'addEvaluation':
-        return jsonResponse(addEvaluation(data));
-      case 'updateEvaluation':
-        return jsonResponse(updateEvaluation(data));
-      case 'deleteEvaluation':
-        return jsonResponse(deleteEvaluation(data));
-      case 'updateBooking':
-        return jsonResponse(updateBooking(data));
-      case 'uploadFileToDrive':
-        return jsonResponse(uploadFileToDrive(data));
-      case 'login':
-        return jsonResponse(login(data));
-      case 'addUser':
-        return jsonResponse(addUser(data));
-      case 'updateUser':
-        return jsonResponse(updateUser(data));
-      case 'deleteUser':
-        return jsonResponse(deleteUser(data));
-      default:
-        return jsonResponse({ success: false, message: 'Unknown action' });
+  if (e.parameter.action) {
+    data = e.parameter;
+  } else {
+    try {
+      data = JSON.parse(e.postData.contents);
+    } catch (err) {
+      return jsonResponse({ success: false, error: 'Invalid request body: ' + err.message });
     }
-  } catch (err) {
-    return jsonResponse({ success: false, error: err.message });
+  }
+
+  const action = data.action;
+
+  switch (action) {
+    case 'addBooking':
+      return jsonResponse(addBooking(data));
+    case 'updateBookingStatus':
+      return jsonResponse(updateBookingStatus(data));
+    case 'deleteBooking':
+      return jsonResponse(deleteBooking(data));
+    case 'addFile':
+      return jsonResponse(addFile(data));
+    case 'updateFileStatus':
+      return jsonResponse(updateFileStatus(data));
+    case 'deleteFile':
+      return jsonResponse(deleteFile(data));
+    case 'updateFile':
+      return jsonResponse(updateFile(data));
+    case 'addEvaluation':
+      return jsonResponse(addEvaluation(data));
+    case 'updateEvaluation':
+      return jsonResponse(updateEvaluation(data));
+    case 'deleteEvaluation':
+      return jsonResponse(deleteEvaluation(data));
+    case 'updateBooking':
+      return jsonResponse(updateBooking(data));
+    case 'uploadFileToDrive':
+      return jsonResponse(uploadFileToDrive(data));
+    case 'login':
+      return jsonResponse(login(data));
+    case 'addUser':
+      return jsonResponse(addUser(data));
+    case 'updateUser':
+      return jsonResponse(updateUser(data));
+    case 'deleteUser':
+      return jsonResponse(deleteUser(data));
+    default:
+      return jsonResponse({ success: false, message: 'Unknown action' });
   }
 }
 
