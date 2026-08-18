@@ -32,80 +32,57 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /* ========== API HELPER ========== */
 async function apiCall(action, data = {}) {
-    return new Promise((resolve) => {
+    try {
         const params = new URLSearchParams({ action, ...data });
         const url = `${CONFIG.SCRIPT_URL}?${params.toString()}`;
-
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', url, true);
-        xhr.setRequestHeader('Accept', 'application/json');
-        xhr.timeout = 15000;
-
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === 4) {
-                if (xhr.status === 200) {
-                    try {
-                        const result = JSON.parse(xhr.responseText);
-                        resolve(result);
-                    } catch (e) {
-                        console.error('Response is not JSON:', xhr.responseText?.substring(0, 200));
-                        resolve({ success: false, error: 'เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง' });
-                    }
-                } else {
-                    console.error('HTTP Error:', xhr.status, xhr.statusText);
-                    resolve({ success: false, error: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ (HTTP ' + xhr.status + ')' });
-                }
-            }
-        };
-
-        xhr.onerror = function() {
-            console.error('XHR Error for:', url);
-            resolve({ success: false, error: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบอินเทอร์เน็ตและ CORS' });
-        };
-
-        xhr.ontimeout = function() {
-            resolve({ success: false, error: 'หมดเวลาเชื่อมต่อ กรุณาลองใหม่' });
-        };
-
-        xhr.send();
-    });
+        const response = await fetch(url, {
+            method: 'GET',
+            mode: 'cors',
+            redirect: 'follow',
+            headers: { 'Accept': 'application/json' }
+        });
+        const text = await response.text();
+        // Check if response is HTML (redirect/login page)
+        if (text.startsWith('<!DOCTYPE') || text.startsWith('<html') || text.includes('<script')) {
+            console.error('Response is HTML:', text.substring(0, 150));
+            return { success: false, error: 'เซิร์ฟเวอร์ตอบกลับเป็นหน้า HTML (อาจเป็นหน้า login Google)' };
+        }
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            console.error('Response is not JSON:', text.substring(0, 200));
+            return { success: false, error: 'เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง' };
+        }
+    } catch (error) {
+        console.error('API Error:', error);
+        return { success: false, error: 'การเชื่อมต่อเครือข่ายล้มเหลว: ' + (error.message || 'Unknown error') };
+    }
 }
 
 async function apiPost(action, data = {}) {
-    return new Promise((resolve) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', CONFIG.SCRIPT_URL, true);
-        xhr.setRequestHeader('Content-Type', 'text/plain;charset=utf-8');
-        xhr.timeout = 15000;
-
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === 4) {
-                if (xhr.status === 200) {
-                    try {
-                        const result = JSON.parse(xhr.responseText);
-                        resolve(result);
-                    } catch (e) {
-                        console.error('Post response is not JSON:', xhr.responseText?.substring(0, 200));
-                        resolve({ success: false, error: 'เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง' });
-                    }
-                } else {
-                    console.error('POST HTTP Error:', xhr.status, xhr.statusText);
-                    resolve({ success: false, error: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ (HTTP ' + xhr.status + ')' });
-                }
-            }
-        };
-
-        xhr.onerror = function() {
-            console.error('XHR POST Error');
-            resolve({ success: false, error: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบอินเทอร์เน็ตและ CORS' });
-        };
-
-        xhr.ontimeout = function() {
-            resolve({ success: false, error: 'หมดเวลาเชื่อมต่อ กรุณาลองใหม่' });
-        };
-
-        xhr.send(JSON.stringify({ action, ...data }));
-    });
+    try {
+        const response = await fetch(CONFIG.SCRIPT_URL, {
+            method: 'POST',
+            mode: 'cors',
+            redirect: 'follow',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action, ...data })
+        });
+        const text = await response.text();
+        if (text.startsWith('<!DOCTYPE') || text.startsWith('<html') || text.includes('<script')) {
+            console.error('POST Response is HTML:', text.substring(0, 150));
+            return { success: false, error: 'เซิร์ฟเวอร์ตอบกลับเป็นหน้า HTML (อาจเป็นหน้า login Google)' };
+        }
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            console.error('POST response is not JSON:', text.substring(0, 200));
+            return { success: false, error: 'เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง' };
+        }
+    } catch (error) {
+        console.error('API Post Error:', error);
+        return { success: false, error: 'การเชื่อมต่อเครือข่ายล้มเหลว: ' + (error.message || 'Unknown error') };
+    }
 }
 
 /* ========== LOCAL STORAGE HELPER ========== */
