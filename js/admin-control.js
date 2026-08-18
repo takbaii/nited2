@@ -6,6 +6,7 @@
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2));
   const val = id => (document.getElementById(id)?.value ?? '').trim();
   const notify = (m,t='success') => { if(typeof showToast==='function') showToast(m,t); else alert(m); };
+  let refreshTimer = null;
 
   const schemas = {
     bookings:{title:'การจอง',actionAdd:'addBooking',actionUpdate:'updateBooking',actionDelete:'deleteBooking',load:'getBookings',fields:[['date','วันที่','date'],['time','เวลา','time'],['teacherName','ชื่อครู','text'],['department','กลุ่มสาระ','text'],['period','คาบ','text'],['subjectName','วิชา','text'],['subjectCode','รหัสวิชา','text'],['classLevel','ระดับชั้น','text'],['room','ห้อง','text'],['status','สถานะ','text']]},
@@ -15,18 +16,18 @@
   };
   let data={bookings:[],files:[],evaluations:[],users:[]},currentTab='bookings';
 
-  function isAdmin(){
-    const nav=q('#navAdmin');
-    return !!(nav && nav.style.display!=='none' && nav.offsetParent!==null);
-  }
+  function isAdmin(){const nav=q('#navAdmin');return !!(nav && nav.style.display!=='none' && nav.offsetParent!==null);}
+  function setSyncState(text,ok=true){const el=q('#accSyncState');if(el){el.innerHTML='<i class="fas fa-circle"></i> '+escA(text);el.classList.toggle('ok',ok);}}
   async function loadAll(){
-    if(!isAdmin() || typeof apiCall!=='function') return;
-    const pairs=await Promise.all(Object.entries(schemas).map(async([k,s])=>{try{const r=await apiCall(s.load);return[k,r&&r.success?(r.data||[]):[]];}catch(_){return[k,[]];}}));
+    if(!isAdmin()||typeof apiCall!=='function')return;
+    setSyncState('กำลังอ่านข้อมูลจาก Google Sheets...',true);
+    const pairs=await Promise.all(Object.entries(schemas).map(async([k,s])=>{try{const r=await apiCall(s.load,{_ts:Date.now()});return[k,r&&r.success?(r.data||[]):[]];}catch(_){return[k,[]];}}));
     pairs.forEach(([k,v])=>data[k]=v);render();
+    setSyncState('เชื่อมต่อ Google Sheets แล้ว • '+new Date().toLocaleTimeString('th-TH'),true);
   }
   function render(){
     const host=q('#adminControlCenter');if(!host)return;const s=schemas[currentTab],rows=data[currentTab]||[];
-    host.innerHTML=`<div class="admin-cc-head"><div><div class="admin-cc-kicker"><i class="fas fa-shield-halved"></i> ADMIN CONTROL CENTER</div><h2>ศูนย์จัดการข้อมูล</h2><p>เพิ่ม แก้ไข ลบ และกำหนดสิทธิ์ข้อมูลใน Google Sheets โดยตรง</p></div><div class="admin-cc-head-actions"><span class="admin-cc-db"><i class="fas fa-database"></i> Google Sheets</span><button class="admin-cc-refresh" id="accRefresh"><i class="fas fa-rotate"></i> รีเฟรช</button></div></div><div class="admin-cc-stats">${Object.entries(schemas).map(([k,x])=>`<button class="acc-stat ${k===currentTab?'active':''}" data-acc-tab="${k}"><span>${escA(x.title)}</span><strong>${data[k].length}</strong></button>`).join('')}</div><div class="admin-cc-toolbar"><div><h3>${escA(s.title)}</h3><small>ข้อมูลทั้งหมด ${rows.length} รายการ</small></div><div class="admin-cc-actions"><input id="accSearch" class="acc-search" placeholder="ค้นหาข้อมูล..." aria-label="ค้นหา"><button id="accAdd" class="btn btn-primary"><i class="fas fa-plus"></i> เพิ่ม${escA(s.title)}</button></div></div><div class="admin-cc-table-wrap"><table class="admin-cc-table"><thead><tr>${s.fields.map(f=>`<th>${escA(f[1])}</th>`).join('')}<th>จัดการ</th></tr></thead><tbody id="accBody"></tbody></table></div>`;
+    host.innerHTML=`<div class="admin-cc-head"><div><div class="admin-cc-kicker"><i class="fas fa-shield-halved"></i> ADMIN CONTROL CENTER</div><h2>ศูนย์จัดการข้อมูล</h2><p>ข้อมูลในหน้านี้อ่านและบันทึกกับ Google Sheets โดยตรง</p></div><div class="admin-cc-head-actions"><span class="admin-cc-db"><i class="fas fa-database"></i> Google Sheets</span><span id="accSyncState" class="acc-sync-state"><i class="fas fa-circle"></i> กำลังอ่านข้อมูล...</span><button class="admin-cc-refresh" id="accRefresh"><i class="fas fa-rotate"></i> รีเฟรช</button></div></div><div class="admin-cc-stats">${Object.entries(schemas).map(([k,x])=>`<button class="acc-stat ${k===currentTab?'active':''}" data-acc-tab="${k}"><span>${escA(x.title)}</span><strong>${data[k].length}</strong></button>`).join('')}</div><div class="admin-cc-toolbar"><div><h3>${escA(s.title)}</h3><small>ข้อมูลจาก Google Sheets ทั้งหมด ${rows.length} รายการ</small></div><div class="admin-cc-actions"><input id="accSearch" class="acc-search" placeholder="ค้นหาข้อมูล..." aria-label="ค้นหา"><button id="accAdd" class="btn btn-primary"><i class="fas fa-plus"></i> เพิ่ม${escA(s.title)}</button></div></div><div class="admin-cc-table-wrap"><table class="admin-cc-table"><thead><tr>${s.fields.map(f=>`<th>${escA(f[1])}</th>`).join('')}<th>จัดการ</th></tr></thead><tbody id="accBody"></tbody></table></div>`;
     host.querySelectorAll('[data-acc-tab]').forEach(b=>b.addEventListener('click',()=>{currentTab=b.dataset.accTab;render();}));
     q('#accRefresh').onclick=loadAll;q('#accAdd').onclick=()=>openEditor(null);q('#accSearch').oninput=e=>renderRows(e.target.value);renderRows('');
   }
@@ -51,7 +52,10 @@
     q('#accForm').onsubmit=async e=>{e.preventDefault();const payload={id:row?.id||uid()};s.fields.forEach(f=>{let x=val('acc_'+f[0]);if(f[2]==='active')x=x==='true';payload[f[0]]=x;});if(currentTab==='users'&&!payload.password&&edit)delete payload.password;if(currentTab==='users'&&!payload.username)return notify('กรุณาระบุชื่อผู้ใช้','error');if(typeof apiPost!=='function')return notify('ไม่พบ API','error');const r=await apiPost(edit?s.actionUpdate:s.actionAdd,payload);if(r&&r.success===false)return notify(r.error||'บันทึกไม่สำเร็จ','error');close();await loadAll();notify(edit?'แก้ไขข้อมูลสำเร็จ':'เพิ่มข้อมูลสำเร็จ');};
   }
   async function removeRow(id){if(!confirm('ยืนยันการลบข้อมูลรายการนี้? ข้อมูลจะถูกลบจาก Google Sheets'))return;const s=schemas[currentTab];if(typeof apiPost!=='function')return notify('ไม่พบ API','error');const r=await apiPost(s.actionDelete,{id});if(r&&r.success===false)return notify(r.error||'ลบข้อมูลไม่สำเร็จ','error');await loadAll();notify('ลบข้อมูลแล้ว');}
-  function boot(){if(!isAdmin())return;const page=q('#page-admin');if(!page)return;let host=q('#adminControlCenter');if(!host){host=document.createElement('div');host.id='adminControlCenter';page.insertBefore(host,page.firstElementChild);}loadAll();}
+  function boot(){
+    if(!isAdmin())return;const page=q('#page-admin');if(!page)return;let host=q('#adminControlCenter');if(!host){host=document.createElement('div');host.id='adminControlCenter';page.insertBefore(host,page.firstElementChild);}loadAll();
+    clearInterval(refreshTimer);refreshTimer=setInterval(()=>{if(isAdmin()&&q('#page-admin')?.classList.contains('active'))loadAll();},30000);
+  }
   window.addEventListener('load',()=>setTimeout(boot,500));
   if(typeof window.navigateTo==='function'){const oldNavigate=window.navigateTo;window.navigateTo=function(page){const r=oldNavigate.apply(this,arguments);if(page==='admin')setTimeout(boot,250);return r;};}
 })();
