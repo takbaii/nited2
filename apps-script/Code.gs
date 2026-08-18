@@ -26,6 +26,8 @@ function doGet(e) {
       return jsonResponse(seedData());
     case 'seedUsers':
       return jsonResponse(seedUsers());
+    case 'login':
+      return jsonResponse(login(e.parameter));
     default:
       return jsonResponse({ success: true, message: 'Supervision System API is running' });
   }

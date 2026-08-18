@@ -1,6 +1,6 @@
 /* ========== CONFIGURATION ========== */
 const CONFIG = {
-    SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwKeloJr-QhSMRqcWEvV9UQGzvl60tcnPLp4fHcr9JtUOd1SvzPjsj5MdRvViygmjSNPQ/exec',
+    SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbySzHc9CP4wcNnrEI-M93UGyMPPW8O7uNqpuN1DNyJFx9sLSH5vgdNbi1tcwvh3msxzng/exec',
     SPREADSHEET_ID: '1e5530q7hRUdR6pNIx6tAv4JjNKadFibg7GE5ohuq4xU',
     DRIVE_FOLDER_ID: '1wVAG7EETgBcv5ftOFLLzdX-wbDEK95Dw',
     ADMIN_PASSWORD: 'admin123',
@@ -80,7 +80,7 @@ function initLogin() {
         const password = document.getElementById('loginPassword').value.trim();
         const errorEl = document.getElementById('loginError');
 
-        const result = await apiPost('login', { username, password });
+        const result = await apiCall('login', { username, password });
 
         if (result && result.success) {
             currentUser = result.user;
