@@ -24,6 +24,8 @@ function doGet(e) {
       return jsonResponse(runSetup());
     case 'seed':
       return jsonResponse(seedData());
+    case 'seedUsers':
+      return jsonResponse(seedUsers());
     default:
       return jsonResponse({ success: true, message: 'Supervision System API is running' });
   }
@@ -846,6 +848,53 @@ function seedData() {
   });
 
   return { success: true, message: 'Seeded ' + bookings.length + ' bookings, ' + files.length + ' files, ' + evals.length + ' evaluations.' };
+}
+
+/* ========== SEED USERS ========== */
+function seedUsers() {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    let sheet = ss.getSheetByName('Users');
+
+    if (!sheet) {
+      sheet = ss.insertSheet('Users');
+      sheet.appendRow(['Username', 'Password', 'Role', 'FullName', 'Department', 'Active', 'ID']);
+      sheet.getRange(1, 1, 1, 7).setFontWeight('bold').setBackground('#E6A817').setFontColor('#FFFFFF');
+    }
+
+    const existing = sheet.getDataRange().getValues();
+    const existingUsernames = existing.slice(1).map(r => r[0]);
+
+    const users = [
+      ['admin', 'admin123', 'admin', 'ผู้ดูแลระบบ', '-', true, 'u_admin'],
+      ['somchai', '1234', 'user', 'สมชาย วงศ์สุข', 'คณิตศาสตร์', true, 'u_001'],
+      ['somjai', '1234', 'user', 'สมหญิง แก้วมณี', 'วิทยาศาสตร์', true, 'u_002'],
+      ['arun', '1234', 'user', 'อรุณ สุขสวัสดิ์', 'ภาษาไทย', true, 'u_003'],
+      ['pimjai', '1234', 'user', 'พิมพ์ใจ แสนสุข', 'สังคมศึกษา', true, 'u_004'],
+      ['muslim', '1234', 'user', 'มุสลิม ดอเลาะ', 'ศาสนา', true, 'u_005'],
+      ['rohani', '1234', 'user', 'รอฮานี หะยีซา', 'ภาษาอังกฤษ', true, 'u_006'],
+      ['sakariya', '1234', 'user', 'ซาการียา แมะอุ', 'คณิตศาสตร์', true, 'u_007'],
+      ['nura', '1234', 'user', 'นุร๊าะ ดอเลาะ', 'วิทยาศาสตร์', true, 'u_008'],
+      ['fatimah', '1234', 'user', 'ฟาติมะห์ ยูโซะ', 'ภาษาอังกฤษ', true, 'u_009'],
+      ['sulaiman', '1234', 'user', 'สุไลมาน ดอเลาะ', 'สังคมศึกษา', true, 'u_010'],
+      ['rosani', '1234', 'user', 'รอซานี หะยีแน', 'คณิตศาสตร์', true, 'u_011'],
+      ['abdulloh', '1234', 'user', 'อับดุลเลาะ ซูหะ', 'วิทยาศาสตร์', true, 'u_012'],
+    ];
+
+    let added = 0;
+    users.forEach(u => {
+      if (!existingUsernames.includes(u[0])) {
+        sheet.appendRow([
+          u[0], u[1], u[2], u[3], u[4], u[5], u[6]
+        ]);
+        added++;
+      }
+    });
+
+    return { success: true, message: 'Added ' + added + ' users. Total users: ' + (sheet.getLastRow() - 1) };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
 }
 
 /* ========== RUN SETUP ========== */
