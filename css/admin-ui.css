@@ -1,0 +1,203 @@
+/* =========================================================
+   Takbai Internal Supervision - Admin/Data UI v2
+   Focus: clean admin workspace, readable tables, responsive data
+   ========================================================= */
+:root{
+  --admin-gold:#E6A817;
+  --admin-gold-dark:#B97D08;
+  --admin-navy:#171B35;
+  --admin-ink:#1F2937;
+  --admin-muted:#667085;
+  --admin-line:#E7EAF0;
+  --admin-bg:#F5F7FB;
+  --admin-white:#FFFFFF;
+  --admin-shadow:0 10px 28px rgba(23,27,53,.07);
+}
+
+/* Main workspace */
+.main-content{background:linear-gradient(180deg,#F8F9FC 0,#F4F6FA 180px,#F4F6FA 100%);min-height:100vh}
+.topbar{height:78px;padding:0 32px;border-bottom:1px solid #E8EAF0;background:rgba(255,255,255,.96);box-shadow:0 2px 14px rgba(23,27,53,.04)}
+.topbar h2{font-size:1.35rem;letter-spacing:-.01em}
+.topbar small{margin-top:1px;font-size:.8rem}
+.page{padding:30px 32px 42px;max-width:1700px}
+
+/* Admin page header */
+#page-admin{position:relative}
+#page-admin::before{
+  content:"ศูนย์จัดการข้อมูลระบบนิเทศ";
+  display:block;
+  font-size:1.5rem;
+  font-weight:800;
+  color:var(--admin-navy);
+  margin:0 0 4px;
+}
+#page-admin::after{
+  content:"จัดการการจอง ไฟล์ ผลการประเมิน และบัญชีผู้ใช้จากฐานข้อมูลส่วนกลาง";
+  display:block;
+  color:var(--admin-muted);
+  font-size:.84rem;
+  margin:0 0 20px;
+}
+
+/* Admin tabs: always a single clean horizontal toolbar on desktop */
+#page-admin>.tabs{
+  width:100%;
+  max-width:none;
+  display:flex!important;
+  align-items:center;
+  gap:8px;
+  flex-wrap:nowrap;
+  overflow-x:auto;
+  overflow-y:hidden;
+  padding:6px;
+  margin:0 0 18px;
+  background:#E9ECF3;
+  border:1px solid #E0E4EC;
+  border-radius:14px;
+  box-shadow:0 4px 14px rgba(23,27,53,.04);
+}
+#page-admin>.tabs::-webkit-scrollbar{height:5px}
+#page-admin>.tabs::-webkit-scrollbar-thumb{background:#C7CCD7;border-radius:99px}
+#page-admin>.tabs .tab-btn{
+  flex:0 0 auto;
+  min-width:120px;
+  min-height:42px;
+  padding:9px 18px;
+  border:1px solid transparent;
+  border-radius:10px;
+  color:#596174;
+  background:transparent;
+  font-weight:800;
+  font-size:.88rem;
+  transition:all .2s ease;
+}
+#page-admin>.tabs .tab-btn:hover{background:rgba(255,255,255,.72);color:var(--admin-navy);transform:translateY(-1px)}
+#page-admin>.tabs .tab-btn.active{
+  color:var(--admin-navy);
+  background:#fff;
+  border-color:#E4E7ED;
+  box-shadow:0 4px 12px rgba(23,27,53,.09);
+}
+#page-admin>.tabs .tab-btn::before{font-family:"Font Awesome 6 Free";font-weight:900;margin-right:8px}
+#page-admin>.tabs .tab-btn:nth-child(1)::before{content:"\f073"}
+#page-admin>.tabs .tab-btn:nth-child(2)::before{content:"\f15b"}
+#page-admin>.tabs .tab-btn:nth-child(3)::before{content:"\f46d"}
+#page-admin>.tabs .tab-btn:nth-child(4)::before{content:"\f0c0"}
+
+/* Admin data cards */
+#page-admin>.tab-content{
+  background:var(--admin-white);
+  border:1px solid #E5E8EF;
+  border-radius:18px;
+  box-shadow:var(--admin-shadow);
+  overflow:hidden;
+  margin-bottom:0;
+}
+#page-admin>.tab-content.active{display:block!important}
+#page-admin>.tab-content .card-body{padding:0!important}
+#page-admin>.tab-content .table-responsive{
+  border:0;
+  border-radius:0;
+  background:#fff;
+  max-height:calc(100vh - 280px);
+  overflow:auto;
+}
+
+/* Table header */
+#page-admin table{min-width:980px!important}
+#page-admin table thead{position:sticky;top:0;z-index:4}
+#page-admin table th{
+  height:50px;
+  padding:13px 16px;
+  background:linear-gradient(180deg,#F8F9FC,#F2F4F8);
+  color:#4B5567;
+  border-bottom:1px solid #DDE2EA;
+  font-size:.76rem;
+  letter-spacing:.01em;
+}
+#page-admin table td{
+  padding:13px 16px;
+  min-height:54px;
+  color:#2F3748;
+  font-size:.84rem;
+  border-bottom:1px solid #EEF0F4;
+  background:#fff;
+}
+#page-admin table tbody tr:nth-child(even) td{background:#FCFDFE}
+#page-admin table tbody tr:hover td{background:#FFF9E9}
+#page-admin table tbody tr:last-child td{border-bottom:0}
+#page-admin table td:first-child,#page-admin table th:first-child{padding-left:22px}
+#page-admin table td:last-child,#page-admin table th:last-child{padding-right:22px}
+
+/* Keep action buttons together */
+#page-admin td:last-child .btn-group,
+#page-admin td:last-child>div,
+#page-admin td:last-child{white-space:nowrap}
+#page-admin td .btn{margin:2px 3px 2px 0;vertical-align:middle}
+#page-admin td .btn-sm{min-width:34px;height:34px;padding:6px 9px;border-radius:9px}
+#page-admin td .btn-success{background:#35A853}
+#page-admin td .btn-danger{background:#D93035}
+#page-admin td .btn-info{background:#2867D8}
+
+/* Status badges */
+#page-admin .badge{min-height:28px;padding:4px 11px;border-radius:999px;font-size:.72rem;box-shadow:inset 0 0 0 1px rgba(0,0,0,.025)}
+
+/* Users tab: make the create-user area a proper toolbar */
+#adminUsersTab>.card-body{padding:20px!important}
+#adminUsersTab>.card-body>.form-row{
+  display:grid;
+  grid-template-columns:1fr 1fr 1.25fr 1.1fr auto;
+  gap:10px;
+  align-items:end;
+  padding:16px;
+  margin:0 0 16px;
+  border:1px solid #E8EBF1;
+  border-radius:14px;
+  background:linear-gradient(180deg,#FCFDFE,#F7F9FC);
+}
+#adminUsersTab>.card-body>.form-row input{height:43px;min-width:0!important;border-radius:10px;background:#fff}
+#adminUsersTab>#adminUsersTab .form-row{margin-bottom:0}
+#adminUsersTab #addUserBtn{height:43px;padding-inline:18px}
+#adminUsersTab>.card-body>.table-responsive{border:1px solid #E8EBF1;border-radius:13px;overflow:auto}
+
+/* Empty/loading states injected into tables */
+#page-admin table td[colspan]{height:120px;text-align:center;color:#8A93A3;background:#fff!important;font-weight:700}
+
+/* General data tables outside admin */
+.page:not(#page-admin) .card-body.table-responsive,
+.page:not(#page-admin) .table-responsive{
+  border-radius:14px;
+}
+.page:not(#page-admin) .card-body.table-responsive table{min-width:820px}
+.page:not(#page-admin) table thead th{position:sticky;top:0;z-index:2;background:#F7F8FA}
+.page:not(#page-admin) table tbody tr:hover{background:#FFFDF5}
+
+/* Calendar cards */
+#page-booking .fc,
+#page-dashboard .fc{border-radius:12px;overflow:hidden}
+
+/* Mobile */
+@media(max-width:900px){
+  .topbar{height:70px;padding:0 18px}
+  .page{padding:20px 16px 30px}
+  #page-admin::before{font-size:1.25rem}
+  #page-admin>.tabs{margin-bottom:14px}
+  #page-admin>.tabs .tab-btn{min-width:108px;padding-inline:14px}
+  #page-admin>.tab-content .table-responsive{max-height:none}
+  #adminUsersTab>.card-body>.form-row{grid-template-columns:1fr 1fr}
+  #adminUsersTab #addUserBtn{width:100%}
+}
+@media(max-width:600px){
+  .topbar{height:64px}
+  .page{padding:14px 11px 24px}
+  #page-admin::before{font-size:1.08rem}
+  #page-admin::after{font-size:.76rem;line-height:1.5;margin-bottom:14px}
+  #page-admin>.tabs{border-radius:12px;padding:5px}
+  #page-admin>.tabs .tab-btn{min-width:102px;min-height:40px;padding:8px 12px;font-size:.78rem}
+  #adminUsersTab>.card-body{padding:12px!important}
+  #adminUsersTab>.card-body>.form-row{grid-template-columns:1fr;gap:8px;padding:12px}
+  #page-admin table{min-width:920px!important}
+}
+
+/* Accessibility / reduced motion */
+@media(prefers-reduced-motion:reduce){#page-admin>.tabs .tab-btn{transition:none}.main-content *{scroll-behavior:auto!important}}
