@@ -1,6 +1,6 @@
 /* API compatibility overrides. Filename is intentionally late in the project so this route is the final declaration. */
 function routeGet_(p){
-  const a=String(p.action||'health');
+  const a=String(p.action||'');
   switch(a){
     case'health':case'debug':return health_();
     case'setup':return setup_();
@@ -13,6 +13,7 @@ function routeGet_(p){
     case'getTeachers':return getTeachersForRequest_(p.authToken);
     case'getLearningAreas':return getLearningAreas_();
     case'getDashboard':return dashboard_();
+    case'addTeacher':case'updateTeacher':case'deleteTeacher':return adminWrite_(a,p);
     default:return{success:false,error:'Unknown GET action: '+a};
   }
 }
