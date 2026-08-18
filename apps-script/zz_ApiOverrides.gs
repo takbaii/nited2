@@ -18,8 +18,9 @@ function routeGet_(p){
   }
 }
 function getTeachersForRequest_(token){
+  const setup=setup_();
   const r=getSheetObjects_('Teachers',teacherHeaders_());
   if(!r.success)return r;
   const auth=token?requireAdmin_(token):{ok:false};
-  return{success:true,data:auth.ok?(r.data||[]):(r.data||[]).filter(x=>String(x.active).toLowerCase()!=='false')};
+  return{success:true,data:auth.ok?(r.data||[]):(r.data||[]).filter(x=>String(x.active).toLowerCase()!=='false'),sheets:setup.sheets};
 }
