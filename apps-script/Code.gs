@@ -18,6 +18,8 @@ function doGet(e) {
       return jsonResponse(getEvaluations());
     case 'getDashboard':
       return jsonResponse(getDashboardData());
+    case 'getUsers':
+      return jsonResponse(getUsers());
     case 'setup':
       return jsonResponse(runSetup());
     case 'seed':
@@ -57,6 +59,14 @@ function doPost(e) {
         return jsonResponse(updateBooking(data));
       case 'uploadFileToDrive':
         return jsonResponse(uploadFileToDrive(data));
+      case 'login':
+        return jsonResponse(login(data));
+      case 'addUser':
+        return jsonResponse(addUser(data));
+      case 'updateUser':
+        return jsonResponse(updateUser(data));
+      case 'deleteUser':
+        return jsonResponse(deleteUser(data));
       default:
         return jsonResponse({ success: false, message: 'Unknown action' });
     }
@@ -472,6 +482,146 @@ function uploadFileToDrive(data) {
   }
 }
 
+/* ========== USERS ========== */
+function getUsers() {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    let sheet = ss.getSheetByName('Users');
+
+    if (!sheet) {
+      sheet = ss.insertSheet('Users');
+      sheet.appendRow(['Username', 'Password', 'Role', 'FullName', 'Department', 'Active', 'ID']);
+      sheet.getRange(1, 1, 1, 7).setFontWeight('bold').setBackground('#E6A817').setFontColor('#FFFFFF');
+      const defaultId = 'u_admin';
+      sheet.appendRow(['admin', 'admin123', 'admin', 'ผู้ดูแลระบบ', '-', true, defaultId]);
+    }
+
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return { success: true, data: [] };
+
+    const headers = data[0];
+    const users = data.slice(1).map(row => {
+      const obj = {};
+      headers.forEach((h, i) => {
+        const key = headerToKey(h);
+        obj[key] = row[i];
+      });
+      return obj;
+    });
+
+    return { success: true, data: users };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+function login(data) {
+  try {
+    const result = getUsers();
+    if (!result.success) return result;
+
+    const user = result.data.find(u =>
+      u.username === data.username && u.password === data.password
+    );
+
+    if (user) {
+      return {
+        success: true,
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role,
+          fullName: user.fullName,
+          department: user.department
+        }
+      };
+    }
+    return { success: false, message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+function addUser(data) {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    let sheet = ss.getSheetByName('Users');
+
+    if (!sheet) {
+      sheet = ss.insertSheet('Users');
+      sheet.appendRow(['Username', 'Password', 'Role', 'FullName', 'Department', 'Active', 'ID']);
+      sheet.getRange(1, 1, 1, 7).setFontWeight('bold').setBackground('#E6A817').setFontColor('#FFFFFF');
+    }
+
+    const result = getUsers();
+    if (result.data && result.data.some(u => u.username === data.username)) {
+      return { success: false, message: 'ชื่อผู้ใช้นี้มีอยู่แล้ว' };
+    }
+
+    const id = data.id || 'u_' + new Date().getTime().toString();
+    sheet.appendRow([
+      data.username || '',
+      data.password || '',
+      data.role || 'user',
+      data.fullName || '',
+      data.department || '',
+      data.active !== undefined ? data.active : true,
+      id
+    ]);
+
+    return { success: true, message: 'User added', id: id };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+function updateUser(data) {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName('Users');
+    if (!sheet) return { success: false, message: 'Sheet not found' };
+
+    const allData = sheet.getDataRange().getValues();
+    for (let i = 1; i < allData.length; i++) {
+      if (allData[i][6] == data.id) {
+        const rowNum = i + 1;
+        if (data.username !== undefined) sheet.getRange(rowNum, 1).setValue(data.username);
+        if (data.password !== undefined) sheet.getRange(rowNum, 2).setValue(data.password);
+        if (data.role !== undefined) sheet.getRange(rowNum, 3).setValue(data.role);
+        if (data.fullName !== undefined) sheet.getRange(rowNum, 4).setValue(data.fullName);
+        if (data.department !== undefined) sheet.getRange(rowNum, 5).setValue(data.department);
+        if (data.active !== undefined) sheet.getRange(rowNum, 6).setValue(data.active);
+        return { success: true, message: 'User updated' };
+      }
+    }
+    return { success: false, message: 'User not found' };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+function deleteUser(data) {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName('Users');
+    if (!sheet) return { success: false, message: 'Sheet not found' };
+
+    const allData = sheet.getDataRange().getValues();
+    for (let i = 1; i < allData.length; i++) {
+      if (allData[i][6] == data.id) {
+        if (allData[i][0] === 'admin') {
+          return { success: false, message: 'ไม่สามารถลบผู้ดูแลระบบหลักได้' };
+        }
+        sheet.deleteRow(i + 1);
+        return { success: true, message: 'User deleted' };
+      }
+    }
+    return { success: false, message: 'User not found' };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
 /* ========== DASHBOARD ========== */
 function getDashboardData() {
   try {
@@ -518,7 +668,13 @@ function headerToKey(header) {
     'Strengths': 'strengths',
     'Improvements': 'improvements',
     'Suggestions': 'suggestions',
-    'Summary': 'summary'
+    'Summary': 'summary',
+    'Username': 'username',
+    'Password': 'password',
+    'Role': 'role',
+    'FullName': 'fullName',
+    'Department': 'department',
+    'Active': 'active'
   };
   return map[header] || header.toLowerCase().replace(/\s+/g, '_');
 }
@@ -558,6 +714,15 @@ function setupSheets() {
       'Improvements', 'Suggestions', 'Summary', 'ID'
     ]);
     supervisionSheet.getRange(1, 1, 1, 8).setFontWeight('bold').setBackground('#E6A817').setFontColor('#FFFFFF');
+  }
+
+  // Create Users sheet
+  let usersSheet = ss.getSheetByName('Users');
+  if (!usersSheet) {
+    usersSheet = ss.insertSheet('Users');
+    usersSheet.appendRow(['Username', 'Password', 'Role', 'FullName', 'Department', 'Active', 'ID']);
+    usersSheet.getRange(1, 1, 1, 7).setFontWeight('bold').setBackground('#E6A817').setFontColor('#FFFFFF');
+    usersSheet.appendRow(['admin', 'admin123', 'admin', 'ผู้ดูแลระบบ', '-', true, 'u_admin']);
   }
 
   Logger.log('Setup complete! All sheets created.');

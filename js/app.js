@@ -13,6 +13,7 @@ let isAdmin = false;
 let allBookings = [];
 let allFiles = [];
 let allEvaluations = [];
+let allUsers = [];
 let calendarInstances = {};
 
 /* ========== INIT ========== */
@@ -73,19 +74,21 @@ function setLocalData(key, data) {
 /* ========== LOGIN ========== */
 function initLogin() {
     const form = document.getElementById('loginForm');
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const username = document.getElementById('loginUsername').value.trim();
         const password = document.getElementById('loginPassword').value.trim();
         const errorEl = document.getElementById('loginError');
 
-        if (username === CONFIG.ADMIN_USERNAME && password === CONFIG.ADMIN_PASSWORD) {
-            currentUser = username;
-            isAdmin = true;
+        const result = await apiPost('login', { username, password });
+
+        if (result && result.success) {
+            currentUser = result.user;
+            isAdmin = result.user.role === 'admin';
             errorEl.style.display = 'none';
             showMainApp();
         } else {
-            errorEl.textContent = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+            errorEl.textContent = result?.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
             errorEl.style.display = 'block';
         }
     });
@@ -102,7 +105,7 @@ function initLogin() {
 function showMainApp() {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('mainApp').style.display = 'flex';
-    document.getElementById('currentUserName').textContent = currentUser;
+    document.getElementById('currentUserName').textContent = currentUser.fullName || currentUser.username;
     if (isAdmin) {
         document.getElementById('navAdmin').style.display = 'block';
     }
@@ -188,7 +191,8 @@ async function loadAllData() {
     await Promise.all([
         loadBookingsData(),
         loadFilesData(),
-        loadEvaluationsData()
+        loadEvaluationsData(),
+        loadUsersData()
     ]);
     loadDashboard();
 }
@@ -682,7 +686,9 @@ function loadAdminData() {
     loadAdminBookings();
     loadAdminFiles();
     loadAdminEvaluations();
+    loadAdminUsers();
     populateTeacherDropdown('reportTeacher');
+    initUserForm();
 }
 
 function loadAdminBookings() {
@@ -1373,6 +1379,161 @@ function deleteEvaluationAdmin(index) {
         loadAdminEvaluations();
         loadEvaluationList();
     }
+}
+
+/* ========== USER MANAGEMENT ========== */
+async function loadUsersData() {
+    const result = await apiCall('getUsers');
+    if (result && result.success && Array.isArray(result.data)) {
+        allUsers = result.data;
+    } else {
+        allUsers = getLocalData('users');
+    }
+    setLocalData('users', allUsers);
+}
+
+function loadAdminUsers() {
+    const tbody = document.getElementById('adminUsers');
+    if (!tbody) return;
+    tbody.innerHTML = allUsers.length ? allUsers.map((u, i) => `
+        <tr>
+            <td>${u.username || '-'}</td>
+            <td>${u.fullName || '-'}</td>
+            <td>${u.department || '-'}</td>
+            <td>${u.role === 'admin' ? '<span class="badge badge-completed">Admin</span>' : '<span class="badge badge-approved">User</span>'}</td>
+            <td>${u.active == true || u.active === 'true' ? '<span class="badge badge-confirmed">ใช้งาน</span>' : '<span class="badge badge-rejected">ปิดใช้งาน</span>'}</td>
+            <td>
+                <div class="btn-group">
+                    <button class="btn btn-info btn-sm" onclick="editUser(${i})" title="แก้ไข"><i class="fas fa-edit"></i></button>
+                    ${u.username !== 'admin' ? `<button class="btn btn-secondary btn-sm" onclick="deleteUserAdmin(${i})" title="ลบ"><i class="fas fa-trash"></i></button>` : ''}
+                </div>
+            </td>
+        </tr>
+    `).join('') : '<tr><td colspan="6" class="text-center">ไม่มีผู้ใช้</td></tr>';
+}
+
+function initUserForm() {
+    const form = document.getElementById('userForm');
+    if (!form) return;
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('newUsername').value.trim();
+        const password = document.getElementById('newPassword').value.trim();
+        const fullName = document.getElementById('newFullName').value.trim();
+        const department = document.getElementById('newDepartment').value;
+        const role = document.getElementById('newRole').value;
+
+        if (allUsers.some(u => u.username === username)) {
+            showToast('ชื่อผู้ใช้นี้มีอยู่แล้ว', 'error');
+            return;
+        }
+
+        const result = await apiPost('addUser', { username, password, fullName, department, role, active: true });
+
+        if (result && result.success) {
+            allUsers.push({ username, password, fullName, department, role, active: true, id: result.id });
+            setLocalData('users', allUsers);
+            form.reset();
+            showToast('เพิ่มผู้ใช้สำเร็จ!');
+            loadAdminUsers();
+        } else {
+            showToast(result?.message || 'เพิ่มผู้ใช้ไม่สำเร็จ', 'error');
+        }
+    });
+}
+
+function editUser(index) {
+    const user = allUsers[index];
+    if (!user) return;
+
+    const body = `
+        <form id="editUserForm" class="edit-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>ชื่อผู้ใช้</label>
+                    <input type="text" id="editUsername" value="${user.username || ''}" ${user.username === 'admin' ? 'readonly' : ''}>
+                </div>
+                <div class="form-group">
+                    <label>รหัสผ่าน (ปล่อยว่างหากไม่เปลี่ยน)</label>
+                    <input type="password" id="editPassword" placeholder="ปล่อยว่างหากไม่เปลี่ยน">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>ชื่อ-นามสกุล</label>
+                    <input type="text" id="editFullName" value="${user.fullName || ''}">
+                </div>
+                <div class="form-group">
+                    <label>กลุ่มสาระ</label>
+                    <select id="editDepartment">
+                        <option value="-">-- ไม่ระบุ --</option>
+                        ${['ภาษาไทย','คณิตศาสตร์','วิทยาศาสตร์','สังคมศึกษา','ภาษาอังกฤษ','สุขศึกษา','ศิลปะ','การงานอาชีพ','เทคโนโลยี'].map(d => `<option value="${d}" ${user.department === d ? 'selected' : ''}>${d}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>สิทธิ์การใช้งาน</label>
+                    <select id="editRole">
+                        <option value="user" ${user.role === 'user' ? 'selected' : ''}>ครู (User)</option>
+                        <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>ผู้ดูแลระบบ (Admin)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>สถานะ</label>
+                    <select id="editActive">
+                        <option value="true" ${user.active == true || user.active === 'true' ? 'selected' : ''}>ใช้งาน</option>
+                        <option value="false" ${user.active == false || user.active === 'false' ? 'selected' : ''}>ปิดใช้งาน</option>
+                    </select>
+                </div>
+            </div>
+        </form>
+    `;
+    const footer = `
+        <button class="btn btn-secondary" onclick="closeModal()">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="saveEditUser('${user.id}')"><i class="fas fa-save"></i> บันทึก</button>
+    `;
+    showModal('แก้ไขผู้ใช้', body, footer);
+}
+
+async function saveEditUser(id) {
+    const updates = { id };
+    updates.username = document.getElementById('editUsername').value.trim();
+    const newPass = document.getElementById('editPassword').value.trim();
+    if (newPass) updates.password = newPass;
+    updates.fullName = document.getElementById('editFullName').value.trim();
+    updates.department = document.getElementById('editDepartment').value;
+    updates.role = document.getElementById('editRole').value;
+    updates.active = document.getElementById('editActive').value;
+
+    const result = await apiPost('updateUser', updates);
+    if (result && result.success) {
+        const idx = allUsers.findIndex(u => u.id === id);
+        if (idx !== -1) Object.assign(allUsers[idx], updates);
+        setLocalData('users', allUsers);
+        showToast('แก้ไขผู้ใช้สำเร็จ');
+        closeModal();
+        loadAdminUsers();
+    } else {
+        showToast(result?.message || 'แก้ไขไม่สำเร็จ', 'error');
+    }
+}
+
+function deleteUserAdmin(index) {
+    if (!confirm('ต้องการลบผู้ใช้นี้ใช่หรือไม่?')) return;
+    const user = allUsers[index];
+    if (!user) return;
+
+    apiPost('deleteUser', { id: user.id }).then(result => {
+        if (result && result.success) {
+            allUsers.splice(index, 1);
+            setLocalData('users', allUsers);
+            showToast('ลบผู้ใช้แล้ว');
+            loadAdminUsers();
+        } else {
+            showToast(result?.message || 'ลบไม่สำเร็จ', 'error');
+        }
+    });
 }
 
 /* ========== HELPERS ========== */
