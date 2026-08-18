@@ -508,7 +508,7 @@ function loadMyFiles() {
             <td>${formatDate(f.timestamp)}</td>
             <td>${f.teacherName || '-'}</td>
             <td>${f.fileType || '-'}</td>
-            <td>${f.fileName || (f.fileUrl ? '<a href="' + f.fileUrl + '" target="_blank"><i class="fas fa-external-link-alt"></i> เปิดลิงก์</a>' : '-')}</td>
+            <td>${renderFileCell(f)}</td>
             <td>${getStatusBadge(f.status)}</td>
         </tr>
     `).join('') : '<tr><td colspan="5" class="text-center">ยังไม่มีไฟล์งาน</td></tr>';
@@ -658,6 +658,7 @@ function loadAdminBookings() {
                     ${b.status === 'ยืนยันแล้ว' ? `
                         <button class="btn btn-info btn-sm" onclick="updateBookingStatus(${i}, 'นิเทศแล้ว')"><i class="fas fa-check-double"></i></button>
                     ` : ''}
+                    <button class="btn btn-warning btn-sm" onclick="editBooking(${i})" title="แก้ไข"><i class="fas fa-edit"></i></button>
                     <button class="btn btn-secondary btn-sm" onclick="deleteBooking(${i})"><i class="fas fa-trash"></i></button>
                 </div>
             </td>
@@ -714,12 +715,14 @@ function loadAdminFiles() {
             <td>${formatDate(f.timestamp)}</td>
             <td>${f.teacherName || '-'}</td>
             <td>${f.fileType || '-'}</td>
-            <td>${f.fileName || (f.fileUrl ? '<a href="' + f.fileUrl + '" target="_blank"><i class="fas fa-external-link-alt"></i></a>' : '-')}</td>
+            <td>${renderFileCell(f)}</td>
             <td>${getStatusBadge(f.status)}</td>
             <td>
                 <div class="btn-group">
                     ${f.status !== 'ผ่าน' ? `<button class="btn btn-success btn-sm" onclick="updateFileStatus(${i}, 'ผ่าน')"><i class="fas fa-check"></i></button>` : ''}
                     ${f.status !== 'ปรับปรุง' ? `<button class="btn btn-warning btn-sm" onclick="updateFileStatus(${i}, 'ปรับปรุง')"><i class="fas fa-exclamation-triangle"></i></button>` : ''}
+                    <button class="btn btn-info btn-sm" onclick="editFile(${i})" title="แก้ไข"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-secondary btn-sm" onclick="deleteFileAdmin(${i})" title="ลบ"><i class="fas fa-trash"></i></button>
                 </div>
             </td>
         </tr>
@@ -741,7 +744,7 @@ function updateFileStatus(index, status) {
 function loadAdminEvaluations() {
     const tbody = document.getElementById('adminEvaluations');
     const recent = [...allEvaluations].reverse();
-    tbody.innerHTML = recent.length ? recent.map(e => `
+    tbody.innerHTML = recent.length ? recent.map((e, i) => `
         <tr>
             <td>${formatDate(e.timestamp)}</td>
             <td>${e.teacherName || '-'}</td>
@@ -750,8 +753,14 @@ function loadAdminEvaluations() {
             <td>${truncate(e.improvements, 40)}</td>
             <td>${truncate(e.suggestions, 40)}</td>
             <td>${getLevelBadge(e.summary)}</td>
+            <td>
+                <div class="btn-group">
+                    <button class="btn btn-info btn-sm" onclick="editEvaluation(${i})" title="แก้ไข"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-secondary btn-sm" onclick="deleteEvaluationAdmin(${i})" title="ลบ"><i class="fas fa-trash"></i></button>
+                </div>
+            </td>
         </tr>
-    `).join('') : '<tr><td colspan="7" class="text-center">ไม่มีผลการประเมิน</td></tr>';
+    `).join('') : '<tr><td colspan="8" class="text-center">ไม่มีผลการประเมิน</td></tr>';
 }
 
 /* ========== REPORTS ========== */
@@ -889,6 +898,330 @@ function printDeptReport() {
             <button class="btn btn-primary" onclick="window.print()"><i class="fas fa-print"></i> พิมพ์รายงาน</button>
         </div>
     `;
+}
+
+/* ========== FILE PREVIEW ========== */
+function renderFileCell(f) {
+    if (!f.fileName && !f.fileUrl) return '-';
+    if (f.fileName) {
+        const ext = f.fileName.split('.').pop().toLowerCase();
+        const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+        const isVideo = ['mp4', 'webm', 'ogg'].includes(ext);
+        if (isImage && f.fileUrl && f.fileUrl !== 'pending_upload') {
+            return `<span class="file-name-link" onclick="showFilePreview('${f.fileUrl}', 'image', '${f.fileName}')"><i class="fas fa-image"></i> ${f.fileName}</span>`;
+        } else if (isVideo && f.fileUrl && f.fileUrl !== 'pending_upload') {
+            return `<span class="file-name-link" onclick="showFilePreview('${f.fileUrl}', 'video', '${f.fileName}')"><i class="fas fa-video"></i> ${f.fileName}</span>`;
+        } else {
+            return `<i class="fas fa-file"></i> ${f.fileName}`;
+        }
+    }
+    if (f.fileUrl && f.fileUrl !== 'pending_upload') {
+        const isYouTube = f.fileUrl.includes('youtube.com') || f.fileUrl.includes('youtu.be');
+        const isDrive = f.fileUrl.includes('drive.google.com');
+        if (isYouTube) {
+            return `<span class="file-name-link" onclick="showYouTubePreview('${f.fileUrl}')"><i class="fab fa-youtube"></i> ดูวิดีโอ</span>`;
+        } else if (isDrive) {
+            return `<a href="${f.fileUrl}" target="_blank"><i class="fab fa-google-drive"></i> เปิดใน Drive</a>`;
+        } else {
+            return `<span class="file-name-link" onclick="showFilePreview('${f.fileUrl}', 'link', '${f.fileType || 'ไฟล์'}')"><i class="fas fa-external-link-alt"></i> เปิดลิงก์</span>`;
+        }
+    }
+    return '-';
+}
+
+function showFilePreview(url, type, name) {
+    let body = '';
+    if (type === 'image') {
+        body = `<div class="preview-container"><img src="${url}" alt="${name}" class="preview-image" onerror="this.parentElement.innerHTML='<p class=\\'preview-error\\'><i class=\\'fas fa-exclamation-triangle\\'></i> ไม่สามารถโหลดรูปภาพได้</p>'"></div>`;
+    } else if (type === 'video') {
+        body = `<div class="preview-container"><video controls class="preview-video"><source src="${url}">เบราว์เซอร์ไม่รองรับวิดีโอนี้</video></div>`;
+    } else if (type === 'link') {
+        body = `<div class="preview-container"><iframe src="${url}" class="preview-iframe" sandbox="allow-same-origin allow-scripts" onerror="this.parentElement.innerHTML='<p class=\\'preview-error\\'><i class=\\'fas fa-exclamation-triangle\\'></i> ไม่สามารถโหลดได้</p>'"></iframe><p style="margin-top:12px;text-align:center;"><a href="${url}" target="_blank" class="btn btn-primary btn-sm"><i class="fas fa-external-link-alt"></i> เปิดในแท็บใหม่</a></p></div>`;
+    }
+    showModal('Preview: ' + (name || 'ไฟล์'), body);
+}
+
+function showYouTubePreview(url) {
+    let embedUrl = url;
+    const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([^&?#]+)/);
+    if (match) embedUrl = `https://www.youtube.com/embed/${match[1]}`;
+    const body = `<div class="preview-container"><iframe src="${embedUrl}" class="preview-iframe" allowfullscreen></iframe></div>`;
+    showModal('ดูวิดีโอ YouTube', body);
+}
+
+/* ========== EDIT BOOKING ========== */
+function editBooking(index) {
+    const booking = [...allBookings].reverse()[index];
+    if (!booking) return;
+    const originalIdx = allBookings.findIndex(b => b.id === booking.id);
+    if (originalIdx === -1) return;
+
+    const body = `
+        <form id="editBookingForm" class="edit-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>วันที่นิเทศ</label>
+                    <input type="date" id="editBookDate" value="${booking.date || ''}">
+                </div>
+                <div class="form-group">
+                    <label>ช่วงเวลา</label>
+                    <select id="editBookTime">
+                        <option value="">-- เลือกช่วงเวลา --</option>
+                        <option value="08:30-09:30" ${booking.time === '08:30-09:30' ? 'selected' : ''}>08:30 - 09:30</option>
+                        <option value="09:30-10:30" ${booking.time === '09:30-10:30' ? 'selected' : ''}>09:30 - 10:30</option>
+                        <option value="10:30-11:30" ${booking.time === '10:30-11:30' ? 'selected' : ''}>10:30 - 11:30</option>
+                        <option value="13:00-14:00" ${booking.time === '13:00-14:00' ? 'selected' : ''}>13:00 - 14:00</option>
+                        <option value="14:00-15:00" ${booking.time === '14:00-15:00' ? 'selected' : ''}>14:00 - 15:00</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>ชื่อครูผู้สอน</label>
+                    <input type="text" id="editBookTeacher" value="${booking.teacherName || ''}">
+                </div>
+                <div class="form-group">
+                    <label>กลุ่มสาระ</label>
+                    <select id="editBookDept">
+                        <option value="">-- เลือกกลุ่มสาระ --</option>
+                        ${['ภาษาไทย','คณิตศาสตร์','วิทยาศาสตร์','สังคมศึกษา','ภาษาอังกฤษ','สุขศึกษา','ศิลปะ','การงานอาชีพ','เทคโนโลยี'].map(d => `<option value="${d}" ${booking.department === d ? 'selected' : ''}>${d}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>คาบที่</label>
+                    <select id="editBookPeriod">
+                        <option value="">-- เลือกคาบ --</option>
+                        ${[1,2,3,4,5,6,7,8].map(p => `<option value="${p}" ${booking.period == p ? 'selected' : ''}>คาบที่ ${p}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>ชื่อวิชา</label>
+                    <input type="text" id="editBookSubject" value="${booking.subjectName || ''}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>รหัสวิชา</label>
+                    <input type="text" id="editBookSubjectCode" value="${booking.subjectCode || ''}">
+                </div>
+                <div class="form-group">
+                    <label>ระดับชั้น</label>
+                    <select id="editBookClassLevel">
+                        <option value="">-- เลือกระดับชั้น --</option>
+                        ${['ม.1','ม.2','ม.3','ม.4','ม.5','ม.6'].map(l => `<option value="${l}" ${booking.classLevel === l ? 'selected' : ''}>${l}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>ห้องเรียน</label>
+                    <input type="text" id="editBookRoom" value="${booking.room || ''}">
+                </div>
+                <div class="form-group">
+                    <label>สถานะ</label>
+                    <select id="editBookStatus">
+                        ${['รอดำเนินการ','ยืนยันแล้ว','นิเทศแล้ว','ปฏิเสธ'].map(s => `<option value="${s}" ${booking.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+        </form>
+    `;
+    const footer = `
+        <button class="btn btn-secondary" onclick="closeModal()">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="saveEditBooking('${booking.id}')"><i class="fas fa-save"></i> บันทึก</button>
+    `;
+    showModal('แก้ไขการจอง', body, footer);
+}
+
+async function saveEditBooking(id) {
+    const updates = {
+        id: id,
+        date: document.getElementById('editBookDate').value,
+        time: document.getElementById('editBookTime').value,
+        teacherName: document.getElementById('editBookTeacher').value.trim(),
+        department: document.getElementById('editBookDept').value,
+        period: document.getElementById('editBookPeriod').value,
+        subjectName: document.getElementById('editBookSubject').value.trim(),
+        subjectCode: document.getElementById('editBookSubjectCode').value.trim(),
+        classLevel: document.getElementById('editBookClassLevel').value,
+        room: document.getElementById('editBookRoom').value.trim(),
+        status: document.getElementById('editBookStatus').value
+    };
+
+    const originalIdx = allBookings.findIndex(b => b.id === id);
+    if (originalIdx !== -1) {
+        Object.assign(allBookings[originalIdx], updates);
+        setLocalData('bookings', allBookings);
+        await apiPost('updateBooking', updates);
+        showToast('แก้ไขการจองสำเร็จ');
+        closeModal();
+        loadAdminBookings();
+        loadDashboard();
+        refreshCalendars();
+    }
+}
+
+/* ========== EDIT FILE ========== */
+function editFile(index) {
+    const file = [...allFiles].reverse()[index];
+    if (!file) return;
+
+    const body = `
+        <form id="editFileForm" class="edit-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>ชื่อครูผู้สอน</label>
+                    <input type="text" id="editFileTeacher" value="${file.teacherName || ''}">
+                </div>
+                <div class="form-group">
+                    <label>ประเภทไฟล์</label>
+                    <select id="editFileType">
+                        <option value="">-- เลือกประเภท --</option>
+                        ${['แผนการสอน','สื่อการสอน','ภาพกิจกรรม','คลิปวิดีโอ'].map(t => `<option value="${t}" ${file.fileType === t ? 'selected' : ''}>${t}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>ชื่อไฟล์</label>
+                <input type="text" id="editFileName" value="${file.fileName || ''}">
+            </div>
+            <div class="form-group">
+                <label>URL / ลิงก์</label>
+                <input type="url" id="editFileUrl" value="${file.fileUrl || ''}">
+            </div>
+            <div class="form-group">
+                <label>สถานะ</label>
+                <select id="editFileStatus">
+                    ${['รอตรวจสอบ','ผ่าน','ปรับปรุง'].map(s => `<option value="${s}" ${file.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+                </select>
+            </div>
+        </form>
+    `;
+    const footer = `
+        <button class="btn btn-secondary" onclick="closeModal()">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="saveEditFile('${file.id}')"><i class="fas fa-save"></i> บันทึก</button>
+    `;
+    showModal('แก้ไขไฟล์งาน', body, footer);
+}
+
+async function saveEditFile(id) {
+    const updates = {
+        id: id,
+        teacherName: document.getElementById('editFileTeacher').value.trim(),
+        fileType: document.getElementById('editFileType').value,
+        fileName: document.getElementById('editFileName').value.trim(),
+        fileUrl: document.getElementById('editFileUrl').value.trim(),
+        status: document.getElementById('editFileStatus').value
+    };
+
+    const originalIdx = allFiles.findIndex(f => f.id === id);
+    if (originalIdx !== -1) {
+        Object.assign(allFiles[originalIdx], updates);
+        setLocalData('files', allFiles);
+        await apiPost('updateFile', updates);
+        showToast('แก้ไขไฟล์งานสำเร็จ');
+        closeModal();
+        loadAdminFiles();
+        loadMyFiles();
+    }
+}
+
+function deleteFileAdmin(index) {
+    if (!confirm('ต้องการลบไฟล์งานนี้ใช่หรือไม่?')) return;
+    const file = [...allFiles].reverse()[index];
+    const originalIdx = allFiles.findIndex(f => f.id === file.id);
+    if (originalIdx !== -1) {
+        allFiles.splice(originalIdx, 1);
+        setLocalData('files', allFiles);
+        apiPost('deleteFile', { id: file.id });
+        showToast('ลบไฟล์งานแล้ว');
+        loadAdminFiles();
+        loadMyFiles();
+    }
+}
+
+/* ========== EDIT EVALUATION ========== */
+function editEvaluation(index) {
+    const ev = [...allEvaluations].reverse()[index];
+    if (!ev) return;
+
+    const body = `
+        <form id="editEvalForm" class="edit-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>ชื่อครูผู้สอน</label>
+                    <input type="text" id="editEvalTeacher" value="${ev.teacherName || ''}">
+                </div>
+                <div class="form-group">
+                    <label>วันที่นิเทศ</label>
+                    <input type="date" id="editEvalDate" value="${ev.supervisionDate || ''}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>จุดเด่น</label>
+                <textarea id="editEvalStrengths" rows="4">${ev.strengths || ''}</textarea>
+            </div>
+            <div class="form-group">
+                <label>จุดพัฒนา</label>
+                <textarea id="editEvalImprovements" rows="4">${ev.improvements || ''}</textarea>
+            </div>
+            <div class="form-group">
+                <label>ข้อเสนอแนะ</label>
+                <textarea id="editEvalSuggestions" rows="3">${ev.suggestions || ''}</textarea>
+            </div>
+            <div class="form-group">
+                <label>ระดับคุณภาพ</label>
+                <select id="editEvalSummary">
+                    <option value="">-- เลือกระดับ --</option>
+                    ${['ดีมาก','ดี','พอใช้','ปรับปรุง'].map(s => `<option value="${s}" ${ev.summary === s ? 'selected' : ''}>${s}</option>`).join('')}
+                </select>
+            </div>
+        </form>
+    `;
+    const footer = `
+        <button class="btn btn-secondary" onclick="closeModal()">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="saveEditEvaluation('${ev.id}')"><i class="fas fa-save"></i> บันทึก</button>
+    `;
+    showModal('แก้ไขผลการประเมิน', body, footer);
+}
+
+async function saveEditEvaluation(id) {
+    const updates = {
+        id: id,
+        teacherName: document.getElementById('editEvalTeacher').value.trim(),
+        supervisionDate: document.getElementById('editEvalDate').value,
+        strengths: document.getElementById('editEvalStrengths').value.trim(),
+        improvements: document.getElementById('editEvalImprovements').value.trim(),
+        suggestions: document.getElementById('editEvalSuggestions').value.trim(),
+        summary: document.getElementById('editEvalSummary').value
+    };
+
+    const originalIdx = allEvaluations.findIndex(e => e.id === id);
+    if (originalIdx !== -1) {
+        Object.assign(allEvaluations[originalIdx], updates);
+        setLocalData('evaluations', allEvaluations);
+        await apiPost('updateEvaluation', updates);
+        showToast('แก้ไขผลการประเมินสำเร็จ');
+        closeModal();
+        loadAdminEvaluations();
+        loadEvaluationList();
+    }
+}
+
+function deleteEvaluationAdmin(index) {
+    if (!confirm('ต้องการลบผลการประเมินนี้ใช่หรือไม่?')) return;
+    const ev = [...allEvaluations].reverse()[index];
+    const originalIdx = allEvaluations.findIndex(e => e.id === ev.id);
+    if (originalIdx !== -1) {
+        allEvaluations.splice(originalIdx, 1);
+        setLocalData('evaluations', allEvaluations);
+        apiPost('deleteEvaluation', { id: ev.id });
+        showToast('ลบผลการประเมินแล้ว');
+        loadAdminEvaluations();
+        loadEvaluationList();
+    }
 }
 
 /* ========== HELPERS ========== */
