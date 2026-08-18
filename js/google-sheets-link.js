@@ -81,7 +81,7 @@
     if (document.getElementById('nited-admin-file-review')) return;
     const s = document.createElement('script');
     s.id = 'nited-admin-file-review';
-    s.src = 'js/admin-file-review.js?v=20260818-1';
+    s.src = 'js/admin-file-review.js?v=20260818-2';
     s.async = false;
     s.onload = function () { console.log('[NITED] admin file review ready'); };
     s.onerror = function () { console.error('[NITED] admin file review failed to load'); };
