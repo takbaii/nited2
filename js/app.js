@@ -1,6 +1,6 @@
 /* ========== CONFIGURATION ========== */
 const CONFIG = {
-    SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbw9XOz8E_mHczq9y7zkOCfYINC0qIjCv_TpPu4K6ErIOVgunR5bCtyv7wDSx0cZAgWO_Q/exec',
+    SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzr0Nb8UqOnyoZghu3ZnNdzJAGx6w2kYf97BeVzaUuaiAFfKvktcf1LmNtcYHdUGUlt5A/exec',
     SPREADSHEET_ID: '1e5530q7hRUdR6pNIx6tAv4JjNKadFibg7GE5ohuq4xU',
     DRIVE_FOLDER_ID: '1wVAG7EETgBcv5ftOFLLzdX-wbDEK95Dw',
     ADMIN_PASSWORD: 'admin123',
@@ -18,6 +18,8 @@ let calendarInstances = {};
 
 /* ========== INIT ========== */
 document.addEventListener('DOMContentLoaded', () => {
+    // Test connectivity on load
+    testConnection();
     initLogin();
     initNavigation();
     initSidebarToggle();
@@ -29,6 +31,30 @@ document.addEventListener('DOMContentLoaded', () => {
     initReportButtons();
     setTodayDate();
 });
+
+async function testConnection() {
+    try {
+        const response = await fetch(CONFIG.SCRIPT_URL, {
+            method: 'GET',
+            mode: 'cors'
+        });
+        const text = await response.text();
+        if (text.includes('<html') || text.includes('<!DOCTYPE')) {
+            console.warn('Server returned HTML (likely Google login redirect)');
+        } else {
+            console.log('Server connection OK');
+        }
+    } catch (err) {
+        console.error('Server connection test failed:', err.message);
+        // Try no-cors mode to test basic connectivity
+        try {
+            const resp = await fetch(CONFIG.SCRIPT_URL, { mode: 'no-cors' });
+            console.log('Server reachable (no-cors):', resp.type);
+        } catch (e) {
+            console.error('Server also unreachable with no-cors:', e.message);
+        }
+    }
+}
 
 /* ========== API HELPER ========== */
 async function apiCall(action, data = {}) {

@@ -7,6 +7,16 @@ const DRIVE_FOLDER_ID = '1wVAG7EETgBcv5ftOFLLzdX-wbDEK95Dw';
 
 /* ========== WEB APP ENTRY ========== */
 function doGet(e) {
+  // Handle CORS preflight
+  if (e.parameter.action === 'options') {
+    return ContentService
+      .createTextOutput('')
+      .setMimeType(ContentService.MimeType.JSON)
+      .setHeader('Access-Control-Allow-Origin', '*')
+      .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+      .setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  }
+
   const action = e.parameter.action;
 
   switch (action) {
