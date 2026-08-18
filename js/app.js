@@ -71,14 +71,60 @@ function setLocalData(key, data) {
     localStorage.setItem(`nited2_${key}`, JSON.stringify(data));
 }
 
+/* ========== CAPTCHA ========== */
+let captchaAnswer = 0;
+
+function generateCaptcha() {
+    const operators = ['+', '-', '×', '÷'];
+    const op = operators[Math.floor(Math.random() * operators.length)];
+    let a, b, answer;
+    switch (op) {
+        case '+':
+            a = Math.floor(Math.random() * 20) + 1;
+            b = Math.floor(Math.random() * 20) + 1;
+            answer = a + b;
+            break;
+        case '-':
+            a = Math.floor(Math.random() * 20) + 10;
+            b = Math.floor(Math.random() * 10) + 1;
+            answer = a - b;
+            break;
+        case '×':
+            a = Math.floor(Math.random() * 10) + 1;
+            b = Math.floor(Math.random() * 10) + 1;
+            answer = a * b;
+            break;
+        case '÷':
+            b = Math.floor(Math.random() * 9) + 1;
+            answer = Math.floor(Math.random() * 10) + 1;
+            a = b * answer;
+            break;
+    }
+    captchaAnswer = answer;
+    document.getElementById('captchaQuestion').textContent = a + ' ' + op + ' ' + b + ' = ?';
+    document.getElementById('captchaAnswer').value = '';
+}
+
 /* ========== LOGIN ========== */
 function initLogin() {
+    generateCaptcha();
+
+    document.getElementById('captchaRefresh').addEventListener('click', generateCaptcha);
+
     const form = document.getElementById('loginForm');
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const username = document.getElementById('loginUsername').value.trim();
         const password = document.getElementById('loginPassword').value.trim();
+        const captchaInput = document.getElementById('captchaAnswer').value.trim();
         const errorEl = document.getElementById('loginError');
+
+        if (parseInt(captchaInput) !== captchaAnswer) {
+            errorEl.textContent = 'คำตอบ CAPTCHA ไม่ถูกต้อง กรุณาลองใหม่';
+            errorEl.style.display = 'block';
+            generateCaptcha();
+            return;
+        }
 
         const result = await apiCall('login', { username, password });
 
@@ -87,9 +133,11 @@ function initLogin() {
             isAdmin = result.user.role === 'admin';
             errorEl.style.display = 'none';
             showMainApp();
+            generateCaptcha();
         } else {
             errorEl.textContent = result?.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
             errorEl.style.display = 'block';
+            generateCaptcha();
         }
     });
 
@@ -99,6 +147,7 @@ function initLogin() {
         document.getElementById('mainApp').style.display = 'none';
         document.getElementById('loginScreen').style.display = 'flex';
         document.getElementById('loginForm').reset();
+        generateCaptcha();
     });
 }
 
