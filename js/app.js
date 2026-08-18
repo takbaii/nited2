@@ -1,6 +1,6 @@
 /* ========== CONFIGURATION ========== */
 const CONFIG = {
-    SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbySzHc9CP4wcNnrEI-M93UGyMPPW8O7uNqpuN1DNyJFx9sLSH5vgdNbi1tcwvh3msxzng/exec',
+    SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzZ1__5zQHDaKj_BNRVCX8RUTV8w9iWhhaiWNt5CrtAnXu3bn9uePgaIcQv42sXl09GXQ/exec',
     SPREADSHEET_ID: '1e5530q7hRUdR6pNIx6tAv4JjNKadFibg7GE5ohuq4xU',
     DRIVE_FOLDER_ID: '1wVAG7EETgBcv5ftOFLLzdX-wbDEK95Dw',
     ADMIN_PASSWORD: 'admin123',

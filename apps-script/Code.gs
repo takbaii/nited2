@@ -497,7 +497,7 @@ function getUsers() {
       sheet.appendRow(['Username', 'Password', 'Role', 'FullName', 'Department', 'Active', 'ID']);
       sheet.getRange(1, 1, 1, 7).setFontWeight('bold').setBackground('#E6A817').setFontColor('#FFFFFF');
       const defaultId = 'u_admin';
-      sheet.appendRow(['admin', 'admin123', 'admin', 'ผู้ดูแลระบบ', '-', true, defaultId]);
+      sheet.appendRow(['admin', 'Admin@123', 'admin', 'ผู้ดูแลระบบ', '-', true, defaultId]);
     }
 
     const data = sheet.getDataRange().getValues();
@@ -726,7 +726,7 @@ function setupSheets() {
     usersSheet = ss.insertSheet('Users');
     usersSheet.appendRow(['Username', 'Password', 'Role', 'FullName', 'Department', 'Active', 'ID']);
     usersSheet.getRange(1, 1, 1, 7).setFontWeight('bold').setBackground('#E6A817').setFontColor('#FFFFFF');
-    usersSheet.appendRow(['admin', 'admin123', 'admin', 'ผู้ดูแลระบบ', '-', true, 'u_admin']);
+    usersSheet.appendRow(['admin', 'Admin@123', 'admin', 'ผู้ดูแลระบบ', '-', true, 'u_admin']);
   }
 
   Logger.log('Setup complete! All sheets created.');
