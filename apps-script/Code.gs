@@ -523,14 +523,28 @@ function getUsers() {
 
 function login(data) {
   try {
+    const username = (data.username || '').toString().trim();
+    const password = (data.password || '').toString().trim();
+
+    if (!username || !password) {
+      return { success: false, message: 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน' };
+    }
+
     const result = getUsers();
     if (!result.success) return result;
 
+    if (!result.data || result.data.length === 0) {
+      return { success: false, message: 'ไม่มีข้อมูลผู้ใช้ในระบบ กรุณาตั้งค่าผู้ใช้ก่อน' };
+    }
+
     const user = result.data.find(u =>
-      u.username === data.username && u.password === data.password
+      u.username === username && u.password === password
     );
 
     if (user) {
+      if (String(user.active).toLowerCase() === 'false') {
+        return { success: false, message: 'บัญชีนี้ถูกปิดการใช้งาน กรุณาติดต่อผู้ดูแลระบบ' };
+      }
       return {
         success: true,
         user: {
