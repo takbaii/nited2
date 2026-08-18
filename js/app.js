@@ -47,11 +47,11 @@ async function apiPost(action, data = {}) {
     try {
         const response = await fetch(CONFIG.SCRIPT_URL, {
             method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({ action, ...data })
         });
-        return { success: true };
+        const result = await response.json();
+        return result;
     } catch (error) {
         console.error('API Post Error:', error);
         return { success: false, error: error.message };
