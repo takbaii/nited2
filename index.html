@@ -52,13 +52,13 @@
             </div>
             <div class="dashboard-grid">
                 <div class="card"><div class="card-header"><h3><i class="fas fa-list"></i> การจองล่าสุด</h3></div><div class="card-body table-responsive"><table><thead><tr><th>วันที่</th><th>ครู</th><th>กลุ่มสาระ</th><th>สถานะ</th></tr></thead><tbody id="latestBookings"></tbody></table></div></div>
-                <div class="card"><div class="card-header"><h3><i class="fas fa-file"></i> ไฟล์ล่าสุด</h3></div><div class="card-body table-responsive"><table><thead><tr><th>วันที่</th><th>ครู</th><th>ประเภท</th><th>สถานะ</th></tr></thead><tbody id="latestFiles"></tbody></table></div></div>
+                <div class="card"><div class="card-header"><h3><i class="fas fa-file"></i> ไฟล์ล่าสุด</h3></div><div class="card-body table-responsive"><table><thead><tr><th>วันที่</th><th>ครู</th><th>ประเภท</th><th>สถานะ</th></tr></thead><tbody id="latestFiles"></tbody></div></div>
             </div>
             <div class="dashboard-grid"><div class="card"><div class="card-header"><h3><i class="fas fa-chart-bar"></i> สรุปตามกลุ่มสาระ</h3></div><div class="card-body"><canvas id="deptChart"></canvas></div></div><div class="card"><div class="card-header"><h3><i class="fas fa-calendar"></i> ปฏิทิน</h3></div><div class="card-body"><div id="dashboardCalendar"></div></div></div></div>
         </section>
         <section id="page-booking" class="page">
             <div class="card"><div class="card-header"><h3><i class="fas fa-calendar-plus"></i> จองวันนิเทศ</h3></div><div class="card-body"><form id="bookingForm"><div class="form-row">
-                <div class="form-group"><label>วันที่</label><input type="date" id="bookDate" required></div><div class="form-group"><label>เวลา</label><input type="time" id="bookTime" required></div><div class="form-group"><label>ชื่อครู</label><input id="bookTeacher" required></div><div class="form-group"><label>กลุ่มสาระ</label><input id="bookDepartment" required></div><div class="form-group"><label>คาบ</label><input id="bookPeriod"></div><div class="form-group"><label>วิชา</label><input id="bookSubject"></div><div class="form-group"><label>รหัสวิชา</label><input id="bookSubjectCode"></div><div class="form-group"><label>ระดับชั้น</label><input id="bookClassLevel"></div><div class="form-group"><label>ห้อง</label><input id="bookRoom" required></div>
+                <div class="form-group"><label>วันที่</label><input type="date" id="bookDate" required></div><div class="form-group"><label>เวลา</label><input type="time" id="bookTime" required></div><div class="form-group"><label>ชื่อครู</label><input id="bookTeacher" required></div><div class="form-group"><label>กลุ่มสาระการเรียนรู้</label><select id="bookDepartment" required><option value="">— เลือกกลุ่มสาระการเรียนรู้ —</option></select></div><div class="form-group"><label>คาบ</label><input id="bookPeriod"></div><div class="form-group"><label>วิชา</label><input id="bookSubject"></div><div class="form-group"><label>รหัสวิชา</label><input id="bookSubjectCode"></div><div class="form-group"><label>ระดับชั้น</label><input id="bookClassLevel"></div><div class="form-group"><label>ห้อง</label><input id="bookRoom" required></div>
             </div><button class="btn btn-primary" type="submit"><i class="fas fa-save"></i> บันทึกการจอง</button></form></div></div>
             <div class="card"><div class="card-header"><h3><i class="fas fa-calendar"></i> ปฏิทินการนิเทศ</h3></div><div class="card-body"><div id="bookingCalendar"></div></div></div>
             <div class="card"><div class="card-header"><h3>รายการจองของฉัน</h3></div><div class="card-body table-responsive"><table><thead><tr><th>วันที่</th><th>เวลา</th><th>กลุ่มสาระ</th><th>วิชา</th><th>ชั้น</th><th>ห้อง</th><th>สถานะ</th><th></th></tr></thead><tbody id="myBookings"></tbody></table></div></div>
@@ -76,7 +76,7 @@
             <div id="adminBookingsTab" class="tab-content active card"><div class="card-body table-responsive"><table><thead><tr><th>วันที่</th><th>เวลา</th><th>ครู</th><th>กลุ่มสาระ</th><th>วิชา</th><th>ชั้น/ห้อง</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="adminBookings"></tbody></table></div></div>
             <div id="adminFilesTab" class="tab-content card"><div class="card-body table-responsive"><table><thead><tr><th>วันที่</th><th>ครู</th><th>ประเภท</th><th>ไฟล์</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="adminFiles"></tbody></table></div></div>
             <div id="adminEvaluationsTab" class="tab-content card"><div class="card-body table-responsive"><table><thead><tr><th>วันที่</th><th>ครู</th><th>นิเทศ</th><th>จุดเด่น</th><th>พัฒนา</th><th>ข้อเสนอแนะ</th><th>สรุป</th><th>จัดการ</th></tr></thead><tbody id="adminEvaluations"></tbody></table></div></div>
-            <div id="adminUsersTab" class="tab-content card"><div class="card-body"><div class="form-row"><input id="newUsername" placeholder="ชื่อผู้ใช้"><input id="newPassword" placeholder="รหัสผ่าน" type="password"><input id="newFullName" placeholder="ชื่อ-สกุล"><input id="newDepartment" placeholder="กลุ่มสาระ"><button id="addUserBtn" class="btn btn-primary" type="button">เพิ่มผู้ใช้</button></div><div class="table-responsive"><table><thead><tr><th>Username</th><th>ชื่อ</th><th>กลุ่มสาระ</th><th>Role</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="adminUsers"></tbody></table></div></div></div>
+            <div id="adminUsersTab" class="tab-content card"><div class="card-body"><div class="form-row"><input id="newUsername" placeholder="ชื่อผู้ใช้"><input id="newPassword" placeholder="รหัสผ่าน" type="password"><input id="newFullName" placeholder="ชื่อ-สกุล"><select id="newDepartment"><option value="">— เลือกกลุ่มสาระ/หน่วยงาน —</option></select><button id="addUserBtn" class="btn btn-primary" type="button">เพิ่มผู้ใช้</button></div><div class="table-responsive"><table><thead><tr><th>Username</th><th>ชื่อ</th><th>กลุ่มสาระ</th><th>Role</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="adminUsers"></tbody></table></div></div></div>
         </section>
     </main>
 </div>
@@ -87,5 +87,6 @@
 <script src="js/admin-control.js?v=20260818-1"></script>
 <script src="js/google-sheets-link.js?v=20260818-1"></script>
 <script src="js/teacher-directory.js?v=20260818-1"></script>
+<script src="js/learning-area-directory.js?v=20260818-1"></script>
 </body>
 </html>
