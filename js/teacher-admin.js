@@ -1,0 +1,36 @@
+/* Admin Teacher Directory - CRUD backed by Google Sheets */
+(function(){
+  'use strict';
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const getAuth=()=>window.currentUser?.authToken||'';
+  const apiGet=(action,data={})=>new Promise((resolve,reject)=>{
+    const cb='nited_teacher_'+Date.now()+'_'+Math.random().toString(36).slice(2),s=document.createElement('script');
+    const clean=()=>{delete window[cb];s.remove();};
+    window[cb]=r=>{clean();resolve(r||{});};
+    s.onerror=()=>{clean();reject(new Error('เชื่อมต่อฐานข้อมูลไม่สำเร็จ'));};
+    s.src=window.CONFIG.SCRIPT_URL+'?'+new URLSearchParams(Object.assign({action},data,{callback:cb})).toString();
+    document.head.appendChild(s);
+    setTimeout(()=>{if(window[cb]){clean();reject(new Error('หมดเวลารอฐานข้อมูล'));}},20000);
+  });
+  const post=(action,data={})=>window.postViaForm(Object.assign({action,authToken:getAuth()},data));
+  async function load(){
+    const host=document.getElementById('teacherDirectoryAdmin'); if(!host)return;
+    try{
+      const r=await apiGet('getTeachers');
+      const rows=r.data||[];
+      host.innerHTML=`<div class="tda-head"><div><h3><i class="fas fa-users"></i> รายชื่อครู</h3><small>จัดการเพิ่ม แก้ไข ลบ และเปิด/ปิดการใช้งาน โดยบันทึกลง Google Sheets</small></div><button id="tdaAdd" class="btn btn-primary"><i class="fas fa-plus"></i> เพิ่มรายชื่อครู</button></div><div class="tda-tools"><input id="tdaSearch" placeholder="ค้นหารายชื่อครู..."><span>${rows.length} รายชื่อ</span></div><div class="tda-table-wrap"><table class="tda-table"><thead><tr><th>คำนำหน้า</th><th>ชื่อ</th><th>นามสกุล</th><th>ชื่อเต็ม</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="tdaBody"></tbody></table></div>`;
+      const render=(filter='')=>{const q=filter.toLowerCase();const list=rows.filter(x=>!q||[x.prefix,x.firstName,x.lastName,x.fullName].join(' ').toLowerCase().includes(q));const body=document.getElementById('tdaBody');body.innerHTML=list.length?list.map(x=>`<tr><td>${esc(x.prefix)}</td><td>${esc(x.firstName)}</td><td>${esc(x.lastName)}</td><td><strong>${esc(x.fullName)}</strong></td><td>${String(x.active).toLowerCase()==='false'?'<span class="acc-badge off">ปิด</span>':'<span class="acc-badge on">ใช้งาน</span>'}</td><td><button class="tda-edit" data-id="${esc(x.id)}"><i class="fas fa-pen"></i></button><button class="tda-del" data-id="${esc(x.id)}"><i class="fas fa-trash"></i></button></td></tr>`).join(''):'<tr><td colspan="6" class="acc-no-data">ไม่พบข้อมูล</td></tr>';};
+      render('');document.getElementById('tdaSearch').oninput=e=>render(e.target.value);document.getElementById('tdaAdd').onclick=()=>editor(null,rows,load);host.querySelectorAll('.tda-edit').forEach(b=>b.onclick=()=>editor(rows.find(x=>String(x.id)===String(b.dataset.id)),rows,load));host.querySelectorAll('.tda-del').forEach(b=>b.onclick=async()=>{const row=rows.find(x=>String(x.id)===String(b.dataset.id));if(!confirm('ลบรายชื่อ '+(row?.fullName||'')+' จาก Google Sheets ใช่หรือไม่?'))return;const r=await post('deleteTeacher',{id:b.dataset.id});if(!r.success)return alert(r.error||'ลบไม่สำเร็จ');await load();refreshDirectory();});
+    }catch(e){host.innerHTML=`<div class="acc-no-data">${esc(e.message)}</div>`;}
+  }
+  function editor(row,rows,reload){
+    const modal=document.createElement('div');modal.className='acc-modal show';modal.innerHTML=`<div class="acc-modal-backdrop"></div><div class="acc-modal-card"><div class="acc-modal-head"><div><span>Teacher Directory</span><h3>${row?'แก้ไขรายชื่อครู':'เพิ่มรายชื่อครู'}</h3></div><button class="acc-close">×</button></div><form id="tdaForm"><div class="acc-form-grid"><div class="form-group"><label>คำนำหน้าชื่อ</label><select id="tdaPrefix"><option>นาย</option><option>นาง</option><option>นางสาว</option><option>ว่าที่ ร.อ.</option></select></div><div class="form-group"><label>ชื่อ</label><input id="tdaFirst" required></div><div class="form-group"><label>นามสกุล</label><input id="tdaLast" required></div><div class="form-group"><label>สถานะ</label><select id="tdaActive"><option value="true">ใช้งาน</option><option value="false">ปิดใช้งาน</option></select></div></div><div class="acc-modal-foot"><button type="button" class="btn btn-light" id="tdaCancel">ยกเลิก</button><button class="btn btn-primary"><i class="fas fa-save"></i> บันทึกลง Google Sheets</button></div></form></div>`;
+    document.body.appendChild(modal);document.getElementById('tdaPrefix').value=row?.prefix||'นาย';document.getElementById('tdaFirst').value=row?.firstName||'';document.getElementById('tdaLast').value=row?.lastName||'';document.getElementById('tdaActive').value=String(row?.active).toLowerCase()==='false'?'false':'true';
+    const close=()=>modal.remove();modal.querySelector('.acc-close').onclick=close;modal.querySelector('.acc-modal-backdrop').onclick=close;document.getElementById('tdaCancel').onclick=close;
+    document.getElementById('tdaForm').onsubmit=async e=>{e.preventDefault();const payload={id:row?.id||'',prefix:document.getElementById('tdaPrefix').value,firstName:document.getElementById('tdaFirst').value.trim(),lastName:document.getElementById('tdaLast').value.trim(),active:document.getElementById('tdaActive').value==='true'};const r=await post(row?'updateTeacher':'addTeacher',payload);if(!r.success)return alert(r.error||'บันทึกไม่สำเร็จ');close();await reload();refreshDirectory();};
+  }
+  async function refreshDirectory(){if(typeof window.refreshTeacherDirectory==='function')window.refreshTeacherDirectory();}
+  function mount(){if(!window.isAdmin)return;const cc=document.getElementById('adminControlCenter');if(!cc||document.getElementById('teacherDirectoryAdmin'))return;const section=document.createElement('section');section.id='teacherDirectoryAdmin';section.className='teacher-directory-admin';cc.appendChild(section);load();}
+  window.addEventListener('nited-admin-rendered',mount);document.addEventListener('DOMContentLoaded',()=>{setTimeout(mount,1200);const obs=new MutationObserver(()=>setTimeout(mount,50));const cc=document.getElementById('adminControlCenter');if(cc)obs.observe(cc,{childList:true,subtree:true});});
+  window.loadTeacherAdmin=load;
+})();
