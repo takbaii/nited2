@@ -1,422 +1,73 @@
 /*
  * Takbai Internal Supervision - Google Apps Script Backend
- * Spreadsheet: 1e5530q7hRUdR6pNIx6tAv4JjNKadFibg7GE5ohuq4xU
- * Drive folder: 1wVAG7EETgBcv5ftOFLLzdX-wbDEK95Dw
+ * Google Sheets: 1e5530q7hRUdR6pNIx6tAv4JjNKadFibg7GE5ohuq4xU
+ * Google Drive:   1wVAG7EETgBcv5ftOFLLzdX-wbDEK95Dw
  *
- * IMPORTANT:
- * 1) Paste/deploy this file in the Apps Script project used by your Web App.
- * 2) Deploy -> Manage deployments -> Edit -> New version -> Deploy.
- * 3) Execute as: Me, Who has access: Anyone.
- * 4) Run setup_() once from the Apps Script editor to create the sheets/admin user.
+ * User management is synchronized with the Users sheet.
+ * Admin write operations require an authToken issued by login().
+ * Passwords remain in the existing Password column for compatibility.
  */
+const SPREADSHEET_ID='1e5530q7hRUdR6pNIx6tAv4JjNKadFibg7GE5ohuq4xU';
+const DRIVE_FOLDER_ID='1wVAG7EETgBcv5ftOFLLzdX-wbDEK95Dw';
+const APP_NAME='Takbai Internal Supervision API';
+const SESSION_TTL=21600;
 
-const SPREADSHEET_ID = '1e5530q7hRUdR6pNIx6tAv4JjNKadFibg7GE5ohuq4xU';
-const DRIVE_FOLDER_ID = '1wVAG7EETgBcv5ftOFLLzdX-wbDEK95Dw';
-const APP_NAME = 'Takbai Internal Supervision API';
+function doGet(e){const p=(e&&e.parameter)?e.parameter:{};try{return output_(routeGet_(p),p.callback);}catch(err){return output_({success:false,error:errorMessage_(err)},p.callback);}}
+function doPost(e){try{return output_(routePost_(parsePost_(e)),null);}catch(err){return output_({success:false,error:errorMessage_(err)},null);}}
+function output_(obj,callback){const json=JSON.stringify(obj==null?{}:obj);if(callback&&/^[A-Za-z_$][0-9A-Za-z_$\.]*$/.test(String(callback)))return ContentService.createTextOutput(String(callback)+'('+json+');').setMimeType(ContentService.MimeType.JAVASCRIPT);return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);}
+function parsePost_(e){if(!e)return{};if(e.parameter&&Object.keys(e.parameter).length)return Object.assign({},e.parameter);if(e.postData&&e.postData.contents){try{return JSON.parse(String(e.postData.contents));}catch(_){return{};}}return{};}
 
-function doGet(e) {
-  const p = (e && e.parameter) ? e.parameter : {};
-  try {
-    return output_(routeGet_(p), p.callback);
-  } catch (err) {
-    return output_({ success: false, error: errorMessage_(err) }, p.callback);
-  }
-}
+function routeGet_(p){const a=String(p.action||'health');switch(a){
+ case'health':case'debug':return health_();
+ case'setup':return setup_();
+ case'seedUsers':return seedUsers_();
+ case'login':return login_(p);
+ case'getBookings':return getSheetObjects_('Booking',bookingHeaders_());
+ case'getFiles':return getSheetObjects_('Files',fileHeaders_());
+ case'getEvaluations':return getSheetObjects_('Supervision',evaluationHeaders_());
+ case'getUsers':return getUsers_(p.authToken);
+ case'getDashboard':return dashboard_();
+ default:return{success:false,error:'Unknown GET action: '+a};}}
+function routePost_(d){const a=String(d.action||'');switch(a){
+ case'health':return health_();case'setup':return setup_();case'seedUsers':return seedUsers_();case'login':return login_(d);
+ case'addBooking':return addBooking_(d);case'updateBookingStatus':return updateById_('Booking',d.id,{status:d.status});case'deleteBooking':return deleteById_('Booking',d.id);case'updateBooking':return updateById_('Booking',d.id,d);
+ case'addFile':return addFile_(d);case'updateFileStatus':return updateById_('Files',d.id,{status:d.status});case'deleteFile':return deleteById_('Files',d.id);case'updateFile':return updateById_('Files',d.id,d);case'uploadFileToDrive':return uploadFile_(d);
+ case'addEvaluation':return addEvaluation_(d);case'updateEvaluation':return updateById_('Supervision',d.id,d);case'deleteEvaluation':return deleteById_('Supervision',d.id);
+ case'addUser':if(!requireAdmin_(d.authToken).ok)return requireAdmin_(d.authToken).result;return addUser_(d);
+ case'updateUser':if(!requireAdmin_(d.authToken).ok)return requireAdmin_(d.authToken).result;return updateUser_(d);
+ case'deleteUser':if(!requireAdmin_(d.authToken).ok)return requireAdmin_(d.authToken).result;return deleteUser_(d);
+ default:return{success:false,error:'Unknown POST action: '+a};}}
 
-function doPost(e) {
-  try {
-    const data = parsePost_(e);
-    return output_(routePost_(data), null);
-  } catch (err) {
-    return output_({ success: false, error: errorMessage_(err) }, null);
-  }
-}
+function health_(){const r={success:true,service:APP_NAME,version:'2026-08-18-admin-users-v3',spreadsheetId:SPREADSHEET_ID,driveFolderId:DRIVE_FOLDER_ID,timestamp:new Date().toISOString()};try{const ss=SpreadsheetApp.openById(SPREADSHEET_ID);r.spreadsheetName=ss.getName();r.spreadsheetAccessible=true;}catch(e){r.spreadsheetAccessible=false;r.spreadsheetError=errorMessage_(e);}try{const f=DriveApp.getFolderById(DRIVE_FOLDER_ID);r.driveFolderName=f.getName();r.driveAccessible=true;}catch(e){r.driveAccessible=false;r.driveError=errorMessage_(e);}return r;}
+function bookingHeaders_(){return['Timestamp','Date','Time','Teacher Name','Department','Period','Subject Name','Subject Code','Class Level','Room','Status','ID'];}
+function fileHeaders_(){return['Timestamp','Teacher Name','File Type','File URL/Link','Drive File ID','File Name','Status','ID'];}
+function evaluationHeaders_(){return['Timestamp','Teacher Name','Supervision Date','Strengths','Improvements','Suggestions','Summary','ID'];}
+function userHeaders_(){return['Username','Password','Role','FullName','Department','Active','ID'];}
+function headersFor_(n){if(n==='Booking')return bookingHeaders_();if(n==='Files')return fileHeaders_();if(n==='Supervision')return evaluationHeaders_();if(n==='Users')return userHeaders_();throw new Error('Unknown sheet: '+n);}
+function ensureSheet_(name,headers){const ss=SpreadsheetApp.openById(SPREADSHEET_ID);let sh=ss.getSheetByName(name);if(!sh){sh=ss.insertSheet(name);sh.getRange(1,1,1,headers.length).setValues([headers]);sh.setFrozenRows(1);}else if(sh.getLastRow()===0){sh.getRange(1,1,1,headers.length).setValues([headers]);sh.setFrozenRows(1);}return sh;}
+function key_(h){const m={'Timestamp':'timestamp','Date':'date','Time':'time','Teacher Name':'teacherName','Department':'department','Period':'period','Subject Name':'subjectName','Subject Code':'subjectCode','Class Level':'classLevel','Room':'room','Status':'status','ID':'id','File Type':'fileType','File URL/Link':'fileUrl','Drive File ID':'driveFileId','File Name':'fileName','Supervision Date':'supervisionDate','Strengths':'strengths','Improvements':'improvements','Suggestions':'suggestions','Summary':'summary','Username':'username','Password':'password','Role':'role','FullName':'fullName','Active':'active'};return m[h]||h;}
+function normalizeValue_(v){return v instanceof Date?v.toISOString():v;}
+function getSheetObjects_(name,headers){try{const sh=ensureSheet_(name,headers),lr=sh.getLastRow();if(lr<2)return{success:true,data:[]};const vals=sh.getRange(1,1,lr,headers.length).getValues();return{success:true,data:vals.slice(1).map(r=>{const o={};headers.forEach((h,i)=>o[key_(h)]=normalizeValue_(r[i]));return o;})};}catch(e){return{success:false,error:errorMessage_(e),data:[]};}}
+function getUsers_(token){const r=getSheetObjects_('Users',userHeaders_());if(!r.success)return r;const auth=requireAdmin_(token);if(auth.ok)return r;return{success:true,data:r.data.map(u=>({id:u.id,username:u.username,role:u.role,fullName:u.fullName,department:u.department,active:u.active}))};}
+function id_(){return Utilities.getUuid();}
 
-/* ContentService.TextOutput DOES NOT support setHeader().
- * Keep this function limited to createTextOutput + setMimeType. */
-function output_(obj, callback) {
-  const json = JSON.stringify(obj == null ? {} : obj);
-  if (callback && /^[A-Za-z_$][0-9A-Za-z_$\.]*$/.test(String(callback))) {
-    return ContentService
-      .createTextOutput(String(callback) + '(' + json + ');')
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
-  }
-  return ContentService
-    .createTextOutput(json)
-    .setMimeType(ContentService.MimeType.JSON);
-}
+function addBooking_(d){const sh=ensureSheet_('Booking',bookingHeaders_()),id=d.id||id_();sh.appendRow([new Date(),d.date||'',d.time||'',d.teacherName||'',d.department||'',d.period||'',d.subjectName||'',d.subjectCode||'',d.classLevel||'',d.room||'',d.status||'รอดำเนินการ',id]);return{success:true,id:id};}
+function addFile_(d){const sh=ensureSheet_('Files',fileHeaders_()),id=d.id||id_();sh.appendRow([new Date(),d.teacherName||'',d.fileType||'',d.fileUrl||'',d.driveFileId||'',d.fileName||'',d.status||'รอตรวจสอบ',id]);return{success:true,id:id};}
+function addEvaluation_(d){const sh=ensureSheet_('Supervision',evaluationHeaders_()),id=d.id||id_();sh.appendRow([new Date(),d.teacherName||'',d.supervisionDate||'',d.strengths||'',d.improvements||'',d.suggestions||'',d.summary||'',id]);return{success:true,id:id};}
 
-function parsePost_(e) {
-  if (!e) return {};
-  if (e.parameter && Object.keys(e.parameter).length) return Object.assign({}, e.parameter);
-  if (e.postData && e.postData.contents) {
-    const text = String(e.postData.contents);
-    try { return JSON.parse(text); } catch (_) { return {}; }
-  }
-  return {};
-}
+function addUser_(d){const username=String(d.username||'').trim(),password=String(d.password||'');if(!username)return{success:false,error:'กรุณาระบุชื่อผู้ใช้'};if(!password)return{success:false,error:'กรุณาระบุรหัสผ่าน'};const sh=ensureSheet_('Users',userHeaders_()),lr=sh.getLastRow();const rows=lr>1?sh.getRange(2,1,lr-1,7).getValues():[];if(rows.some(r=>String(r[0]).trim().toLowerCase()===username.toLowerCase()))return{success:false,error:'ชื่อผู้ใช้นี้มีอยู่แล้ว'};const id=d.id||id_();const role=String(d.role||'user')==='admin'?'admin':'user';sh.appendRow([username,password,role,String(d.fullName||''),String(d.department||'-'),d.active===undefined?true:String(d.active).toLowerCase()!=='false',id]);return{success:true,id:id,user:{id:id,username:username,password:password,role:role,fullName:String(d.fullName||''),department:String(d.department||'-'),active:d.active===undefined?true:String(d.active).toLowerCase()!=='false'}};}
+function findRow_(sh,id){if(!id)return-1;const lr=sh.getLastRow();if(lr<2)return-1;const col=sh.getLastColumn(),vals=sh.getRange(2,col,lr-1,1).getValues();for(let i=0;i<vals.length;i++)if(String(vals[i][0])===String(id))return i+2;return-1;}
+function updateUser_(d){if(!d.id)return{success:false,error:'ไม่พบ ID ของผู้ใช้'};const sh=ensureSheet_('Users',userHeaders_()),row=findRow_(sh,d.id);if(row<0)return{success:false,error:'ไม่พบผู้ใช้'};const old=sh.getRange(row,1,1,7).getValues()[0],newUsername=d.username===undefined?String(old[0]):String(d.username).trim();if(!newUsername)return{success:false,error:'ชื่อผู้ใช้ห้ามว่าง'};const lr=sh.getLastRow(),rows=lr>1?sh.getRange(2,1,lr-1,7).getValues():[];if(rows.some((r,i)=>i+2!==row&&String(r[0]).trim().toLowerCase()===newUsername.toLowerCase()))return{success:false,error:'ชื่อผู้ใช้นี้มีอยู่แล้ว'};let role=d.role===undefined?String(old[2]):(String(d.role)==='admin'?'admin':'user');const active=d.active===undefined?old[5]:String(d.active).toLowerCase()!=='false';if(String(old[2])==='admin'&&role!=='admin'&&countAdmins_(sh)<=1)return{success:false,error:'ต้องมีผู้ดูแลระบบอย่างน้อย 1 คน'};const values=[newUsername,d.password===undefined||String(d.password)===''?old[1]:String(d.password),role,d.fullName===undefined?old[3]:String(d.fullName),d.department===undefined?old[4]:String(d.department),active,d.id];sh.getRange(row,1,1,7).setValues([values]);return{success:true,id:d.id,user:{id:d.id,username:values[0],password:values[1],role:values[2],fullName:values[3],department:values[4],active:values[5]}};}
+function countAdmins_(sh){const lr=sh.getLastRow();if(lr<2)return 0;return sh.getRange(2,3,lr-1,1).getValues().filter(r=>String(r[0])==='admin').length;}
+function deleteUser_(d){const auth=requireAdmin_(d.authToken);if(!auth.ok)return auth.result;const sh=ensureSheet_('Users',userHeaders_()),row=findRow_(sh,d.id);if(row<0)return{success:false,error:'ไม่พบผู้ใช้'};const target=sh.getRange(row,1,1,7).getValues()[0];if(String(target[6])===String(auth.user.id))return{success:false,error:'ไม่สามารถลบบัญชีที่กำลังใช้งานอยู่'};if(String(target[2])==='admin'&&countAdmins_(sh)<=1)return{success:false,error:'ต้องมีผู้ดูแลระบบอย่างน้อย 1 คน'};sh.deleteRow(row);return{success:true,id:d.id};}
 
-function routeGet_(p) {
-  const action = String(p.action || 'health');
-  switch (action) {
-    case 'health':
-    case 'debug':
-      return health_();
-    case 'setup':
-      return setup_();
-    case 'seedUsers':
-      return seedUsers_();
-    case 'login':
-      return login_(p);
-    case 'getBookings':
-      return getSheetObjects_('Booking', bookingHeaders_());
-    case 'getFiles':
-      return getSheetObjects_('Files', fileHeaders_());
-    case 'getEvaluations':
-      return getSheetObjects_('Supervision', evaluationHeaders_());
-    case 'getUsers':
-      return getSheetObjects_('Users', userHeaders_());
-    case 'getDashboard':
-      return dashboard_();
-    default:
-      return { success: false, error: 'Unknown GET action: ' + action };
-  }
-}
+function login_(d){const username=String(d.username||'').trim(),password=String(d.password||'');if(!username||!password)return{success:false,message:'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน'};const r=getSheetObjects_('Users',userHeaders_());if(!r.success)return r;const u=r.data.find(x=>String(x.username)===username&&String(x.password)===password);if(!u)return{success:false,message:'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'};if(String(u.active).toLowerCase()==='false')return{success:false,message:'บัญชีนี้ถูกปิดการใช้งาน'};const token=Utilities.getUuid()+'-'+Utilities.getUuid();CacheService.getScriptCache().put('auth_'+token,JSON.stringify({id:u.id,username:u.username,role:u.role,fullName:u.fullName,department:u.department}),SESSION_TTL);return{success:true,user:{id:u.id,username:u.username,role:u.role,fullName:u.fullName,department:u.department,authToken:token}};}
+function requireAdmin_(token){if(!token)return{ok:false,result:{success:false,error:'ต้องเข้าสู่ระบบผู้ดูแลก่อน'}};const raw=CacheService.getScriptCache().get('auth_'+String(token));if(!raw)return{ok:false,result:{success:false,error:'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่'}};try{const u=JSON.parse(raw);if(u.role!=='admin')return{ok:false,result:{success:false,error:'ไม่มีสิทธิ์ผู้ดูแลระบบ'}};return{ok:true,user:u};}catch(_){return{ok:false,result:{success:false,error:'เซสชันไม่ถูกต้อง'}};}}
 
-function routePost_(d) {
-  const action = String(d.action || '');
-  switch (action) {
-    case 'health':
-      return health_();
-    case 'setup':
-      return setup_();
-    case 'seedUsers':
-      return seedUsers_();
-    case 'login':
-      return login_(d);
-    case 'addBooking':
-      return addBooking_(d);
-    case 'updateBookingStatus':
-      return updateById_('Booking', d.id, { status: d.status });
-    case 'deleteBooking':
-      return deleteById_('Booking', d.id);
-    case 'updateBooking':
-      return updateById_('Booking', d.id, d);
-    case 'addFile':
-      return addFile_(d);
-    case 'updateFileStatus':
-      return updateById_('Files', d.id, { status: d.status });
-    case 'deleteFile':
-      return deleteById_('Files', d.id);
-    case 'updateFile':
-      return updateById_('Files', d.id, d);
-    case 'uploadFileToDrive':
-      return uploadFile_(d);
-    case 'addEvaluation':
-      return addEvaluation_(d);
-    case 'updateEvaluation':
-      return updateById_('Supervision', d.id, d);
-    case 'deleteEvaluation':
-      return deleteById_('Supervision', d.id);
-    case 'addUser':
-      return addUser_(d);
-    case 'updateUser':
-      return updateById_('Users', d.id, d);
-    case 'deleteUser':
-      return deleteById_('Users', d.id);
-    default:
-      return { success: false, error: 'Unknown POST action: ' + action };
-  }
-}
-
-function health_() {
-  const result = {
-    success: true,
-    service: APP_NAME,
-    version: '2026-08-18-safe-api-v2',
-    spreadsheetId: SPREADSHEET_ID,
-    driveFolderId: DRIVE_FOLDER_ID,
-    timestamp: new Date().toISOString()
-  };
-  try {
-    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    result.spreadsheetName = ss.getName();
-    result.spreadsheetAccessible = true;
-  } catch (err) {
-    result.spreadsheetAccessible = false;
-    result.spreadsheetError = errorMessage_(err);
-  }
-  try {
-    const folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
-    result.driveFolderName = folder.getName();
-    result.driveAccessible = true;
-  } catch (err) {
-    result.driveAccessible = false;
-    result.driveError = errorMessage_(err);
-  }
-  return result;
-}
-
-function bookingHeaders_() {
-  return ['Timestamp','Date','Time','Teacher Name','Department','Period','Subject Name','Subject Code','Class Level','Room','Status','ID'];
-}
-function fileHeaders_() {
-  return ['Timestamp','Teacher Name','File Type','File URL/Link','Drive File ID','File Name','Status','ID'];
-}
-function evaluationHeaders_() {
-  return ['Timestamp','Teacher Name','Supervision Date','Strengths','Improvements','Suggestions','Summary','ID'];
-}
-function userHeaders_() {
-  return ['Username','Password','Role','FullName','Department','Active','ID'];
-}
-
-function headersFor_(name) {
-  if (name === 'Booking') return bookingHeaders_();
-  if (name === 'Files') return fileHeaders_();
-  if (name === 'Supervision') return evaluationHeaders_();
-  if (name === 'Users') return userHeaders_();
-  throw new Error('Unknown sheet: ' + name);
-}
-
-function ensureSheet_(name, headers) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  let sh = ss.getSheetByName(name);
-  if (!sh) {
-    sh = ss.insertSheet(name);
-    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sh.setFrozenRows(1);
-  } else if (sh.getLastRow() === 0) {
-    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sh.setFrozenRows(1);
-  }
-  return sh;
-}
-
-function getSheetObjects_(name, headers) {
-  try {
-    const sh = ensureSheet_(name, headers);
-    const lastRow = sh.getLastRow();
-    if (lastRow < 2) return { success: true, data: [] };
-    const values = sh.getRange(1, 1, lastRow, headers.length).getValues();
-    const data = values.slice(1).map(function(row) {
-      const obj = {};
-      headers.forEach(function(h, i) { obj[key_(h)] = normalizeValue_(row[i]); });
-      return obj;
-    });
-    return { success: true, data: data };
-  } catch (err) {
-    return { success: false, error: errorMessage_(err), data: [] };
-  }
-}
-
-function key_(h) {
-  const map = {
-    'Timestamp':'timestamp', 'Date':'date', 'Time':'time', 'Teacher Name':'teacherName',
-    'Department':'department', 'Period':'period', 'Subject Name':'subjectName',
-    'Subject Code':'subjectCode', 'Class Level':'classLevel', 'Room':'room',
-    'Status':'status', 'ID':'id', 'File Type':'fileType', 'File URL/Link':'fileUrl',
-    'Drive File ID':'driveFileId', 'File Name':'fileName', 'Supervision Date':'supervisionDate',
-    'Strengths':'strengths', 'Improvements':'improvements', 'Suggestions':'suggestions',
-    'Summary':'summary', 'Username':'username', 'Password':'password', 'Role':'role',
-    'FullName':'fullName', 'Active':'active'
-  };
-  return map[h] || h;
-}
-
-function normalizeValue_(value) {
-  if (value instanceof Date) return value.toISOString();
-  return value;
-}
-
-function id_() {
-  return Utilities.getUuid();
-}
-
-function addBooking_(d) {
-  const sh = ensureSheet_('Booking', bookingHeaders_());
-  const id = d.id || id_();
-  sh.appendRow([
-    new Date(), d.date || '', d.time || '', d.teacherName || '', d.department || '',
-    d.period || '', d.subjectName || '', d.subjectCode || '', d.classLevel || '',
-    d.room || '', d.status || 'รอดำเนินการ', id
-  ]);
-  return { success: true, id: id };
-}
-
-function addFile_(d) {
-  const sh = ensureSheet_('Files', fileHeaders_());
-  const id = d.id || id_();
-  sh.appendRow([
-    new Date(), d.teacherName || '', d.fileType || '', d.fileUrl || '',
-    d.driveFileId || '', d.fileName || '', d.status || 'รอตรวจสอบ', id
-  ]);
-  return { success: true, id: id };
-}
-
-function addEvaluation_(d) {
-  const sh = ensureSheet_('Supervision', evaluationHeaders_());
-  const id = d.id || id_();
-  sh.appendRow([
-    new Date(), d.teacherName || '', d.supervisionDate || '', d.strengths || '',
-    d.improvements || '', d.suggestions || '', d.summary || '', id
-  ]);
-  return { success: true, id: id };
-}
-
-function addUser_(d) {
-  const sh = ensureSheet_('Users', userHeaders_());
-  const rows = sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow() - 1, 7).getValues() : [];
-  if (rows.some(function(r) { return String(r[0]).toLowerCase() === String(d.username || '').toLowerCase(); })) {
-    return { success: false, error: 'ชื่อผู้ใช้นี้มีอยู่แล้ว' };
-  }
-  const id = d.id || id_();
-  sh.appendRow([
-    d.username || '', d.password || '', d.role || 'user', d.fullName || '',
-    d.department || '-', d.active === undefined ? true : d.active, id
-  ]);
-  return { success: true, id: id };
-}
-
-function findRow_(sh, id) {
-  if (!id) return -1;
-  const lastRow = sh.getLastRow();
-  if (lastRow < 2) return -1;
-  const idCol = sh.getLastColumn();
-  const values = sh.getRange(2, idCol, lastRow - 1, 1).getValues();
-  for (let i = 0; i < values.length; i++) {
-    if (String(values[i][0]) === String(id)) return i + 2;
-  }
-  return -1;
-}
-
-function updateById_(name, id, d) {
-  if (!id) return { success: false, error: 'ไม่พบ ID ของรายการ' };
-  const headers = headersFor_(name);
-  const sh = ensureSheet_(name, headers);
-  const row = findRow_(sh, id);
-  if (row < 0) return { success: false, error: 'ไม่พบรายการ ID: ' + id };
-
-  const map = {
-    'Timestamp':'timestamp', 'Date':'date', 'Time':'time', 'Teacher Name':'teacherName',
-    'Department':'department', 'Period':'period', 'Subject Name':'subjectName',
-    'Subject Code':'subjectCode', 'Class Level':'classLevel', 'Room':'room',
-    'Status':'status', 'File Type':'fileType', 'File URL/Link':'fileUrl',
-    'Drive File ID':'driveFileId', 'File Name':'fileName', 'Supervision Date':'supervisionDate',
-    'Strengths':'strengths', 'Improvements':'improvements', 'Suggestions':'suggestions',
-    'Summary':'summary', 'Username':'username', 'Password':'password', 'Role':'role',
-    'FullName':'fullName', 'Active':'active'
-  };
-
-  headers.forEach(function(h, i) {
-    const k = map[h];
-    if (k && k !== 'timestamp' && d[k] !== undefined) sh.getRange(row, i + 1).setValue(d[k]);
-  });
-  return { success: true, id: id };
-}
-
-function deleteById_(name, id) {
-  const headers = headersFor_(name);
-  const sh = ensureSheet_(name, headers);
-  const row = findRow_(sh, id);
-  if (row < 0) return { success: false, error: 'ไม่พบรายการ' };
-  if (name === 'Users' && String(sh.getRange(row, 1).getValue()) === 'admin') {
-    return { success: false, error: 'ไม่สามารถลบผู้ดูแลระบบหลักได้' };
-  }
-  sh.deleteRow(row);
-  return { success: true, id: id };
-}
-
-function login_(d) {
-  const username = String(d.username || '').trim();
-  const password = String(d.password || '');
-  if (!username || !password) return { success: false, message: 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน' };
-
-  const r = getSheetObjects_('Users', userHeaders_());
-  if (!r.success) return r;
-  const u = r.data.find(function(x) {
-    return String(x.username) === username && String(x.password) === password;
-  });
-  if (!u) return { success: false, message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' };
-  if (String(u.active).toLowerCase() === 'false') return { success: false, message: 'บัญชีนี้ถูกปิดการใช้งาน' };
-
-  return {
-    success: true,
-    user: {
-      id: u.id, username: u.username, role: u.role,
-      fullName: u.fullName, department: u.department
-    }
-  };
-}
-
-function uploadFile_(d) {
-  try {
-    if (!d.fileData || !d.fileName) return { success: false, error: 'ข้อมูลไฟล์ไม่ครบ' };
-    const folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
-    const bytes = Utilities.base64Decode(String(d.fileData));
-    const blob = Utilities.newBlob(bytes, d.mimeType || 'application/octet-stream', d.fileName);
-    const file = folder.createFile(blob);
-
-    try {
-      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    } catch (_) {
-      // Domain/admin policies may prevent public sharing. The file is still created.
-    }
-
-    return {
-      success: true,
-      fileId: file.getId(),
-      fileUrl: 'https://drive.google.com/file/d/' + file.getId() + '/view',
-      directUrl: 'https://drive.google.com/uc?export=view&id=' + file.getId(),
-      fileName: file.getName()
-    };
-  } catch (err) {
-    return { success: false, error: errorMessage_(err) };
-  }
-}
-
-function dashboard_() {
-  const b = getSheetObjects_('Booking', bookingHeaders_).data || [];
-  const f = getSheetObjects_('Files', fileHeaders_).data || [];
-  const e = getSheetObjects_('Supervision', evaluationHeaders_).data || [];
-  return {
-    success: true,
-    stats: {
-      totalBookings: b.length,
-      completed: b.filter(function(x) { return x.status === 'นิเทศแล้ว'; }).length,
-      pending: b.filter(function(x) { return x.status === 'รอดำเนินการ'; }).length,
-      confirmed: b.filter(function(x) { return x.status === 'ยืนยันแล้ว'; }).length,
-      totalFiles: f.length,
-      totalEvaluations: e.length
-    }
-  };
-}
-
-function setup_() {
-  ensureSheet_('Booking', bookingHeaders_());
-  ensureSheet_('Files', fileHeaders_());
-  ensureSheet_('Supervision', evaluationHeaders_());
-  const users = ensureSheet_('Users', userHeaders_());
-  if (users.getLastRow() < 2) {
-    users.appendRow(['admin', 'Admin@123', 'admin', 'ผู้ดูแลระบบ', '-', true, 'u_admin']);
-  }
-  return {
-    success: true,
-    message: 'Setup complete',
-    spreadsheetId: SPREADSHEET_ID,
-    driveFolderId: DRIVE_FOLDER_ID
-  };
-}
-
-function seedUsers_() {
-  const users = ensureSheet_('Users', userHeaders_());
-  const lastRow = users.getLastRow();
-  const exists = lastRow >= 2 && users.getRange(2, 1, lastRow - 1, 1).getValues().some(function(r) {
-    return String(r[0]) === 'admin';
-  });
-  if (!exists) users.appendRow(['admin', 'Admin@123', 'admin', 'ผู้ดูแลระบบ', '-', true, 'u_admin']);
-  return { success: true, message: 'Admin user ready' };
-}
-
-function errorMessage_(err) {
-  return err && err.message ? String(err.message) : String(err);
-}
+function updateById_(name,id,d){if(!id)return{success:false,error:'ไม่พบ ID ของรายการ'};const headers=headersFor_(name),sh=ensureSheet_(name,headers),row=findRow_(sh,id);if(row<0)return{success:false,error:'ไม่พบรายการ ID: '+id};const map={'Timestamp':'timestamp','Date':'date','Time':'time','Teacher Name':'teacherName','Department':'department','Period':'period','Subject Name':'subjectName','Subject Code':'subjectCode','Class Level':'classLevel','Room':'room','Status':'status','File Type':'fileType','File URL/Link':'fileUrl','Drive File ID':'driveFileId','File Name':'fileName','Supervision Date':'supervisionDate','Strengths':'strengths','Improvements':'improvements','Suggestions':'suggestions','Summary':'summary'};headers.forEach((h,i)=>{const k=map[h];if(k&&k!=='timestamp'&&d[k]!==undefined)sh.getRange(row,i+1).setValue(d[k]);});return{success:true,id:id};}
+function deleteById_(name,id){const sh=ensureSheet_(name,headersFor_(name)),row=findRow_(sh,id);if(row<0)return{success:false,error:'ไม่พบรายการ'};sh.deleteRow(row);return{success:true,id:id};}
+function uploadFile_(d){try{if(!d.fileData||!d.fileName)return{success:false,error:'ข้อมูลไฟล์ไม่ครบ'};const folder=DriveApp.getFolderById(DRIVE_FOLDER_ID),bytes=Utilities.base64Decode(String(d.fileData)),blob=Utilities.newBlob(bytes,d.mimeType||'application/octet-stream',d.fileName),file=folder.createFile(blob);try{file.setSharing(DriveApp.Access.ANYONE_WITH_LINK,DriveApp.Permission.VIEW);}catch(_){}return{success:true,fileId:file.getId(),fileUrl:'https://drive.google.com/file/d/'+file.getId()+'/view',directUrl:'https://drive.google.com/uc?export=view&id='+file.getId(),fileName:file.getName()};}catch(e){return{success:false,error:errorMessage_(e)};}}
+function dashboard_(){const b=getSheetObjects_('Booking',bookingHeaders_()).data||[],f=getSheetObjects_('Files',fileHeaders_()).data||[],e=getSheetObjects_('Supervision',evaluationHeaders_()).data||[];return{success:true,stats:{totalBookings:b.length,completed:b.filter(x=>x.status==='นิเทศแล้ว').length,pending:b.filter(x=>x.status==='รอดำเนินการ').length,confirmed:b.filter(x=>x.status==='ยืนยันแล้ว').length,totalFiles:f.length,totalEvaluations:e.length}};}
+function setup_(){ensureSheet_('Booking',bookingHeaders_());ensureSheet_('Files',fileHeaders_());ensureSheet_('Supervision',evaluationHeaders_());const u=ensureSheet_('Users',userHeaders_());if(u.getLastRow()<2)u.appendRow(['admin','Admin@123','admin','ผู้ดูแลระบบ','-',true,'u_admin']);return{success:true,message:'Setup complete',spreadsheetId:SPREADSHEET_ID,driveFolderId:DRIVE_FOLDER_ID};}
+function seedUsers_(){const u=ensureSheet_('Users',userHeaders_()),lr=u.getLastRow(),exists=lr>=2&&u.getRange(2,1,lr-1,1).getValues().some(r=>String(r[0])==='admin');if(!exists)u.appendRow(['admin','Admin@123','admin','ผู้ดูแลระบบ','-',true,'u_admin']);return{success:true,message:'Admin user ready'};}
+function errorMessage_(e){return e&&e.message?String(e.message):String(e);}
