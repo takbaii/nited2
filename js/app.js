@@ -955,43 +955,139 @@ function printDeptReport() {
 }
 
 /* ========== FILE PREVIEW ========== */
+function getFileIcon(ext) {
+    const iconMap = {
+        'pdf': 'fas fa-file-pdf',
+        'doc': 'fas fa-file-word',
+        'docx': 'fas fa-file-word',
+        'ppt': 'fas fa-file-powerpoint',
+        'pptx': 'fas fa-file-powerpoint',
+        'xls': 'fas fa-file-excel',
+        'xlsx': 'fas fa-file-excel',
+        'jpg': 'fas fa-file-image',
+        'jpeg': 'fas fa-file-image',
+        'png': 'fas fa-file-image',
+        'gif': 'fas fa-file-image',
+        'mp4': 'fas fa-file-video',
+        'webm': 'fas fa-file-video'
+    };
+    return iconMap[ext] || 'fas fa-file';
+}
+
 function renderFileCell(f) {
-    if (!f.fileName && !f.fileUrl) return '-';
-    if (f.fileName) {
-        const ext = f.fileName.split('.').pop().toLowerCase();
-        const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
-        const isVideo = ['mp4', 'webm', 'ogg'].includes(ext);
-        if (isImage && f.fileUrl && f.fileUrl !== 'pending_upload') {
-            return `<span class="file-name-link" onclick="showFilePreview('${f.fileUrl}', 'image', '${f.fileName}')"><i class="fas fa-image"></i> ${f.fileName}</span>`;
-        } else if (isVideo && f.fileUrl && f.fileUrl !== 'pending_upload') {
-            return `<span class="file-name-link" onclick="showFilePreview('${f.fileUrl}', 'video', '${f.fileName}')"><i class="fas fa-video"></i> ${f.fileName}</span>`;
+    const hasFile = f.fileName || (f.fileUrl && f.fileUrl !== 'pending_upload');
+    const hasDriveId = f.driveFileId && f.driveFileId.trim() !== '';
+
+    if (!hasFile && !hasDriveId) return '-';
+
+    const ext = (f.fileName || '').split('.').pop().toLowerCase();
+    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+    const isVideo = ['mp4', 'webm', 'ogg'].includes(ext);
+    const isDoc = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx'].includes(ext);
+    const icon = getFileIcon(ext);
+
+    if (hasDriveId) {
+        const previewUrl = `https://drive.google.com/file/d/${f.driveFileId}/preview`;
+        const viewUrl = `https://drive.google.com/file/d/${f.driveFileId}/view`;
+        const downloadUrl = `https://drive.google.com/uc?export=download&id=${f.driveFileId}`;
+        const directImgUrl = `https://drive.google.com/uc?export=view&id=${f.driveFileId}`;
+
+        if (isImage) {
+            return `<span class="file-name-link" onclick="showDriveImagePreview('${directImgUrl}', '${f.fileName || 'รูปภาพ'}', '${f.driveFileId}')"><i class="${icon}"></i> ${f.fileName || 'ดูรูป'}</span>
+                    <span class="file-view-links">
+                        <a href="${viewUrl}" target="_blank" class="file-ext-link" title="เปิดเต็มจอ"><i class="fas fa-external-link-alt"></i></a>
+                    </span>`;
+        } else if (isVideo) {
+            return `<span class="file-name-link" onclick="showDriveFilePreview('${f.driveFileId}', '${f.fileName || 'วิดีโอ'}', 'video')"><i class="${icon}"></i> ${f.fileName || 'ดูวิดีโอ'}</span>
+                    <span class="file-view-links">
+                        <a href="${viewUrl}" target="_blank" class="file-ext-link" title="เปิดเต็มจอ"><i class="fas fa-external-link-alt"></i></a>
+                    </span>`;
+        } else if (isDoc) {
+            return `<span class="file-name-link" onclick="showDriveFilePreview('${f.driveFileId}', '${f.fileName || 'เอกสาร'}', 'doc')"><i class="${icon}"></i> ${f.fileName || 'ดูเอกสาร'}</span>
+                    <span class="file-view-links">
+                        <a href="${viewUrl}" target="_blank" class="file-ext-link" title="เปิดเต็มจอ"><i class="fas fa-external-link-alt"></i></a>
+                        <a href="${downloadUrl}" class="file-ext-link" title="ดาวน์โหลด"><i class="fas fa-download"></i></a>
+                    </span>`;
         } else {
-            return `<i class="fas fa-file"></i> ${f.fileName}`;
+            return `<span class="file-name-link" onclick="showDriveFilePreview('${f.driveFileId}', '${f.fileName || 'ไฟล์'}', 'doc')"><i class="${icon}"></i> ${f.fileName || 'ดูไฟล์'}</span>
+                    <span class="file-view-links">
+                        <a href="${viewUrl}" target="_blank" class="file-ext-link" title="เปิดเต็มจอ"><i class="fas fa-external-link-alt"></i></a>
+                        <a href="${downloadUrl}" class="file-ext-link" title="ดาวน์โหลด"><i class="fas fa-download"></i></a>
+                    </span>`;
         }
     }
+
+    // No Drive ID - use fileUrl if available
     if (f.fileUrl && f.fileUrl !== 'pending_upload') {
         const isYouTube = f.fileUrl.includes('youtube.com') || f.fileUrl.includes('youtu.be');
-        const isDrive = f.fileUrl.includes('drive.google.com');
         if (isYouTube) {
-            return `<span class="file-name-link" onclick="showYouTubePreview('${f.fileUrl}')"><i class="fab fa-youtube"></i> ดูวิดีโอ</span>`;
-        } else if (isDrive) {
-            return `<a href="${f.fileUrl}" target="_blank"><i class="fab fa-google-drive"></i> เปิดใน Drive</a>`;
+            return `<span class="file-name-link" onclick="showYouTubePreview('${f.fileUrl}')"><i class="fab fa-youtube"></i> ${f.fileName || 'ดูวิดีโอ'}</span>`;
+        } else if (isImage && f.fileUrl) {
+            return `<span class="file-name-link" onclick="showFilePreview('${f.fileUrl}', 'image', '${f.fileName || 'รูปภาพ'}')"><i class="${icon}"></i> ${f.fileName || 'ดูรูป'}</span>`;
         } else {
-            return `<span class="file-name-link" onclick="showFilePreview('${f.fileUrl}', 'link', '${f.fileType || 'ไฟล์'}')"><i class="fas fa-external-link-alt"></i> เปิดลิงก์</span>`;
+            return `<a href="${f.fileUrl}" target="_blank"><i class="${icon}"></i> ${f.fileName || 'เปิดลิงก์'}</a>`;
         }
     }
+
+    if (f.fileName) {
+        return `<i class="${icon}"></i> ${f.fileName}`;
+    }
     return '-';
+}
+
+function showDriveImagePreview(directUrl, name, fileId) {
+    const viewUrl = `https://drive.google.com/file/d/${fileId}/view`;
+    const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+    const body = `
+        <div class="preview-container">
+            <img src="${directUrl}" alt="${name}" class="preview-image"
+                onerror="this.onerror=null; this.src='https://drive.google.com/file/d/${fileId}/preview';">
+            <div class="preview-actions">
+                <a href="${viewUrl}" target="_blank" class="btn btn-primary btn-sm"><i class="fas fa-expand"></i> เปิดเต็มจอ</a>
+                <a href="${downloadUrl}" class="btn btn-success btn-sm"><i class="fas fa-download"></i> ดาวน์โหลด</a>
+            </div>
+        </div>`;
+    showModal('Preview: ' + name, body);
+}
+
+function showDriveFilePreview(fileId, name, type) {
+    const previewUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+    const viewUrl = `https://drive.google.com/file/d/${fileId}/view`;
+    const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+    const embedUrl = type === 'video'
+        ? `https://drive.google.com/file/d/${fileId}/preview`
+        : `https://docs.google.com/gview?url=https://drive.google.com/uc?export=download%26id=${fileId}&embedded=true`;
+
+    const body = `
+        <div class="preview-container">
+            <iframe src="${previewUrl}" class="preview-iframe" allowfullscreen></iframe>
+            <div class="preview-actions">
+                <a href="${viewUrl}" target="_blank" class="btn btn-primary btn-sm"><i class="fas fa-expand"></i> เปิดเต็มจอ</a>
+                <a href="${downloadUrl}" class="btn btn-success btn-sm"><i class="fas fa-download"></i> ดาวน์โหลด</a>
+            </div>
+        </div>`;
+    showModal('Preview: ' + name, body);
 }
 
 function showFilePreview(url, type, name) {
     let body = '';
     if (type === 'image') {
-        const imgUrl = url.includes('drive.google.com/uc?export=view') ? url : url;
-        body = `<div class="preview-container"><img src="${imgUrl}" alt="${name}" class="preview-image" onerror="this.src='https://drive.google.com/uc?export=view&id=${url.match(/id=([^&]+)/)?.[1] || ''}'; this.onerror=function(){this.parentElement.innerHTML='<p class=\\'preview-error\\'><i class=\\'fas fa-exclamation-triangle\\'></i> ไม่สามารถโหลดรูปภาพได้</p>';}"></div>`;
+        body = `<div class="preview-container">
+            <img src="${url}" alt="${name}" class="preview-image"
+                onerror="this.onerror=null; this.parentElement.innerHTML='<p class=\\'preview-error\\'><i class=\\'fas fa-exclamation-triangle\\'></i> ไม่สามารถโหลดรูปภาพได้</p>';">
+            <div class="preview-actions">
+                <a href="${url}" target="_blank" class="btn btn-primary btn-sm"><i class="fas fa-expand"></i> เปิดเต็มจอ</a>
+            </div>
+        </div>`;
     } else if (type === 'video') {
         body = `<div class="preview-container"><video controls class="preview-video"><source src="${url}">เบราว์เซอร์ไม่รองรับวิดีโอนี้</video></div>`;
-    } else if (type === 'link') {
-        body = `<div class="preview-container"><iframe src="${url}" class="preview-iframe" sandbox="allow-same-origin allow-scripts"></iframe><p style="margin-top:12px;text-align:center;"><a href="${url}" target="_blank" class="btn btn-primary btn-sm"><i class="fas fa-external-link-alt"></i> เปิดในแท็บใหม่</a></p></div>`;
+    } else {
+        body = `<div class="preview-container">
+            <iframe src="${url}" class="preview-iframe" sandbox="allow-same-origin allow-scripts"></iframe>
+            <div class="preview-actions">
+                <a href="${url}" target="_blank" class="btn btn-primary btn-sm"><i class="fas fa-external-link-alt"></i> เปิดในแท็บใหม่</a>
+            </div>
+        </div>`;
     }
     showModal('Preview: ' + (name || 'ไฟล์'), body);
 }
