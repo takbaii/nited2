@@ -55,6 +55,8 @@ function doPost(e) {
         return jsonResponse(deleteEvaluation(data));
       case 'updateBooking':
         return jsonResponse(updateBooking(data));
+      case 'uploadFileToDrive':
+        return jsonResponse(uploadFileToDrive(data));
       default:
         return jsonResponse({ success: false, message: 'Unknown action' });
     }
@@ -434,6 +436,37 @@ function updateBooking(data) {
       }
     }
     return { success: false, message: 'Booking not found' };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/* ========== FILE UPLOAD TO DRIVE ========== */
+function uploadFileToDrive(data) {
+  try {
+    const folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+    const blob = Utilities.newBlob(
+      Utilities.base64Decode(data.fileData),
+      data.mimeType,
+      data.fileName
+    );
+    const file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    const fileId = file.getId();
+    const fileUrl = 'https://drive.google.com/file/d/' + fileId + '/view';
+    const directUrl = 'https://drive.google.com/uc?export=view&id=' + fileId;
+
+    return {
+      success: true,
+      message: 'File uploaded to Drive',
+      fileId: fileId,
+      fileUrl: fileUrl,
+      directUrl: directUrl,
+      fileName: file.getName(),
+      mimeType: file.getMimeType(),
+      size: file.getSize()
+    };
   } catch (err) {
     return { success: false, error: err.message };
   }

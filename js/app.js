@@ -403,6 +403,40 @@ function cancelBooking(id) {
     }
 }
 
+/* ========== FILE UPLOAD HELPERS ========== */
+function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const base64 = reader.result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+function getFileMimeType(fileName) {
+    const ext = fileName.split('.').pop().toLowerCase();
+    const mimeMap = {
+        'pdf': 'application/pdf',
+        'doc': 'application/msword',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'ppt': 'application/vnd.ms-powerpoint',
+        'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'xls': 'application/vnd.ms-excel',
+        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+        'txt': 'text/plain',
+        'csv': 'text/csv'
+    };
+    return mimeMap[ext] || 'application/octet-stream';
+}
+
 /* ========== FILES ========== */
 function initFileForm() {
     const form = document.getElementById('fileForm');
@@ -430,14 +464,34 @@ function initFileForm() {
 
         if (type === 'คลิปวิดีโอ') {
             fileData.fileUrl = document.getElementById('fileLink').value.trim();
+            fileData.fileName = '';
         } else {
             const fileInput = document.getElementById('fileInput');
             if (!fileInput.files.length) {
                 showToast('กรุณาเลือกไฟล์', 'error');
                 return;
             }
-            fileData.fileName = fileInput.files[0].name;
-            fileData.fileUrl = 'pending_upload';
+
+            const file = fileInput.files[0];
+            showToast('กำลังอัพโหลดไฟล์...', 'info');
+
+            const base64Data = await readFileAsBase64(file);
+            const mimeType = getFileMimeType(file.name);
+
+            const uploadResult = await apiPost('uploadFileToDrive', {
+                fileData: base64Data,
+                fileName: file.name,
+                mimeType: mimeType
+            });
+
+            if (uploadResult && uploadResult.success) {
+                fileData.fileName = file.name;
+                fileData.driveFileId = uploadResult.fileId;
+                fileData.fileUrl = uploadResult.directUrl;
+            } else {
+                showToast('อัพโหลดไฟล์ไม่สำเร็จ: ' + (uploadResult.error || 'ไม่ทราบสาเหตุ'), 'error');
+                return;
+            }
         }
 
         const result = await apiPost('addFile', fileData);
@@ -450,7 +504,7 @@ function initFileForm() {
         document.getElementById('fileLinkSection').style.display = 'none';
         document.getElementById('filePreview').style.display = 'none';
         document.getElementById('uploadProgress').style.display = 'none';
-        showToast('ส่งไฟล์งานสำเร็จ!');
+        showToast('อัพโหลดไฟล์สำเร็จ!');
         loadMyFiles();
     });
 }
@@ -932,11 +986,12 @@ function renderFileCell(f) {
 function showFilePreview(url, type, name) {
     let body = '';
     if (type === 'image') {
-        body = `<div class="preview-container"><img src="${url}" alt="${name}" class="preview-image" onerror="this.parentElement.innerHTML='<p class=\\'preview-error\\'><i class=\\'fas fa-exclamation-triangle\\'></i> ไม่สามารถโหลดรูปภาพได้</p>'"></div>`;
+        const imgUrl = url.includes('drive.google.com/uc?export=view') ? url : url;
+        body = `<div class="preview-container"><img src="${imgUrl}" alt="${name}" class="preview-image" onerror="this.src='https://drive.google.com/uc?export=view&id=${url.match(/id=([^&]+)/)?.[1] || ''}'; this.onerror=function(){this.parentElement.innerHTML='<p class=\\'preview-error\\'><i class=\\'fas fa-exclamation-triangle\\'></i> ไม่สามารถโหลดรูปภาพได้</p>';}"></div>`;
     } else if (type === 'video') {
         body = `<div class="preview-container"><video controls class="preview-video"><source src="${url}">เบราว์เซอร์ไม่รองรับวิดีโอนี้</video></div>`;
     } else if (type === 'link') {
-        body = `<div class="preview-container"><iframe src="${url}" class="preview-iframe" sandbox="allow-same-origin allow-scripts" onerror="this.parentElement.innerHTML='<p class=\\'preview-error\\'><i class=\\'fas fa-exclamation-triangle\\'></i> ไม่สามารถโหลดได้</p>'"></iframe><p style="margin-top:12px;text-align:center;"><a href="${url}" target="_blank" class="btn btn-primary btn-sm"><i class="fas fa-external-link-alt"></i> เปิดในแท็บใหม่</a></p></div>`;
+        body = `<div class="preview-container"><iframe src="${url}" class="preview-iframe" sandbox="allow-same-origin allow-scripts"></iframe><p style="margin-top:12px;text-align:center;"><a href="${url}" target="_blank" class="btn btn-primary btn-sm"><i class="fas fa-external-link-alt"></i> เปิดในแท็บใหม่</a></p></div>`;
     }
     showModal('Preview: ' + (name || 'ไฟล์'), body);
 }
