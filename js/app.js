@@ -1,6 +1,6 @@
 /* ========== CONFIGURATION ========== */
 const CONFIG = {
-    SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzZ1__5zQHDaKj_BNRVCX8RUTV8w9iWhhaiWNt5CrtAnXu3bn9uePgaIcQv42sXl09GXQ/exec',
+    SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxWlWGEihbFG54amhbxcTOLOzw0JyMVAXU6QcpIZZJmr0-HZeWkJHlnYEtZzijHYY4T/exec',
     SPREADSHEET_ID: '1e5530q7hRUdR6pNIx6tAv4JjNKadFibg7GE5ohuq4xU',
     DRIVE_FOLDER_ID: '1wVAG7EETgBcv5ftOFLLzdX-wbDEK95Dw',
     ADMIN_PASSWORD: 'admin123',
@@ -34,13 +34,21 @@ document.addEventListener('DOMContentLoaded', () => {
 async function apiCall(action, data = {}) {
     try {
         const params = new URLSearchParams({ action, ...data });
-        const response = await fetch(`${CONFIG.SCRIPT_URL}?${params.toString()}`);
-        if (!response.ok) throw new Error('Network response was not ok');
-        const result = await response.json();
-        return result;
+        const url = `${CONFIG.SCRIPT_URL}?${params.toString()}`;
+        const response = await fetch(url, {
+            redirect: 'follow',
+            headers: { 'Accept': 'application/json' }
+        });
+        const text = await response.text();
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            console.error('Response is not JSON:', text.substring(0, 200));
+            return { success: false, error: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง' };
+        }
     } catch (error) {
         console.error('API Error:', error);
-        return { success: false, error: error.message };
+        return { success: false, error: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบอินเทอร์เน็ต' };
     }
 }
 
@@ -49,13 +57,19 @@ async function apiPost(action, data = {}) {
         const response = await fetch(CONFIG.SCRIPT_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action, ...data })
+            body: JSON.stringify({ action, ...data }),
+            redirect: 'follow'
         });
-        const result = await response.json();
-        return result;
+        const text = await response.text();
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            console.error('Post response is not JSON:', text.substring(0, 200));
+            return { success: false, error: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง' };
+        }
     } catch (error) {
         console.error('API Post Error:', error);
-        return { success: false, error: error.message };
+        return { success: false, error: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบอินเทอร์เน็ต' };
     }
 }
 
@@ -119,6 +133,12 @@ function initLogin() {
         const captchaInput = document.getElementById('captchaAnswer').value.trim();
         const errorEl = document.getElementById('loginError');
 
+        if (!username || !password) {
+            errorEl.textContent = 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน';
+            errorEl.style.display = 'block';
+            return;
+        }
+
         if (parseInt(captchaInput) !== captchaAnswer) {
             errorEl.textContent = 'คำตอบ CAPTCHA ไม่ถูกต้อง กรุณาลองใหม่';
             errorEl.style.display = 'block';
@@ -126,18 +146,36 @@ function initLogin() {
             return;
         }
 
-        const result = await apiCall('login', { username, password });
+        const loginBtn = form.querySelector('button[type="submit"]');
+        loginBtn.disabled = true;
+        loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังเข้าสู่ระบบ...';
+        errorEl.style.display = 'none';
 
-        if (result && result.success) {
-            currentUser = result.user;
-            isAdmin = result.user.role === 'admin';
-            errorEl.style.display = 'none';
-            showMainApp();
-            generateCaptcha();
-        } else {
-            errorEl.textContent = result?.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+        try {
+            const result = await apiCall('login', { username, password });
+
+            if (result && result.success && result.user) {
+                currentUser = result.user;
+                isAdmin = result.user.role === 'admin';
+                errorEl.style.display = 'none';
+                showMainApp();
+                generateCaptcha();
+            } else if (result && result.error) {
+                errorEl.textContent = 'เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ: ' + result.error;
+                errorEl.style.display = 'block';
+                generateCaptcha();
+            } else {
+                errorEl.textContent = result?.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+                errorEl.style.display = 'block';
+                generateCaptcha();
+            }
+        } catch (err) {
+            errorEl.textContent = 'เกิดข้อผิดพลาด: ' + err.message;
             errorEl.style.display = 'block';
             generateCaptcha();
+        } finally {
+            loginBtn.disabled = false;
+            loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> เข้าสู่ระบบ';
         }
     });
 

@@ -28,6 +28,8 @@ function doGet(e) {
       return jsonResponse(seedUsers());
     case 'login':
       return jsonResponse(login(e.parameter));
+    case 'debug':
+      return jsonResponse(debugInfo());
     default:
       return jsonResponse({ success: true, message: 'Supervision System API is running' });
   }
@@ -850,6 +852,25 @@ function seedData() {
   });
 
   return { success: true, message: 'Seeded ' + bookings.length + ' bookings, ' + files.length + ' files, ' + evals.length + ' evaluations.' };
+}
+
+/* ========== SEED USERS ========== */
+function debugInfo() {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheetNames = ss.getSheets().map(s => s.getName());
+    let usersCount = 0;
+    let usersSample = [];
+    const usersSheet = ss.getSheetByName('Users');
+    if (usersSheet) {
+      const data = usersSheet.getDataRange().getValues();
+      usersCount = data.length - 1;
+      usersSample = data.slice(1, 4).map(r => ({ username: r[0], role: r[2], fullName: r[3], active: r[5] }));
+    }
+    return { success: true, sheets: sheetNames, usersCount, usersSample, timestamp: new Date().toISOString() };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
 }
 
 /* ========== SEED USERS ========== */
