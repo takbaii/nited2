@@ -1,7 +1,7 @@
 /*
  * Takbai Internal Supervision - API overrides for Files workflow.
  * Keep this file last in the Apps Script project.
- * Files is the single source of truth for upload/review/delete.
+ * IMPORTANT: Supervision is handled by the v8 backend in Code-v8-supervision.gs.
  */
 function routeGet_(p){
   const a=String(p.action||'');
@@ -10,12 +10,12 @@ function routeGet_(p){
     case'setup':return setup_();
     case'seedUsers':return seedUsers_();
     case'login':return login_(p);
-    case'getBookings':return getSheetObjects_('Booking',bookingHeaders_());
+    case'getBookings':return list_('Booking');
     case'getFiles':return getFilesForRequest_();
-    case'getEvaluations':return getSheetObjects_('Supervision',evaluationHeaders_());
-    case'getUsers':return getUsers_(p.authToken);
+    case'getEvaluations':return list_('Supervision');
+    case'getUsers':return users_(p.authToken);
     case'getTeachers':return getTeachersForRequest_(p.authToken);
-    case'getLearningAreas':return getLearningAreas_();
+    case'getLearningAreas':return list_('LearningAreas');
     case'getDashboard':return dashboard_();
     case'addTeacher':case'updateTeacher':case'deleteTeacher':return adminWrite_(a,p);
     default:return{success:false,error:'Unknown GET action: '+a};
@@ -30,18 +30,25 @@ function routePost_(d){
     case'seedUsers':return seedUsers_();
     case'login':return login_(d);
     case'addBooking':return addBooking_(d);
-    case'updateBookingStatus':return updateById_('Booking',d.id,{status:d.status});
-    case'deleteBooking':return deleteById_('Booking',d.id);
-    case'updateBooking':return updateById_('Booking',d.id,d);
+    case'updateBookingStatus':return adminUpdateBooking_(d);
+    case'deleteBooking':return del_('Booking',d.id);
+    case'updateBooking':return update_('Booking',d.id,d);
     case'addFile':return addFile_(d);
-    case'updateFileStatus':return updateFileStatusDirect_(d);
-    case'updateFile':return updateFileDirect_(d);
-    case'deleteFile':return deleteFileDirect_(d);
+    case'updateFileStatus':return reviewFile_(d);
+    case'updateFile':return update_('Files',d.id,d);
+    case'deleteFile':return adminDelete_(d,'Files');
     case'uploadFileToDrive':return uploadFile_(d);
-    case'addEvaluation':return addEvaluation_(d);
-    case'updateEvaluation':return updateById_('Supervision',d.id,d);
-    case'deleteEvaluation':return deleteById_('Supervision',d.id);
-    case'addUser':case'updateUser':case'deleteUser':case'addTeacher':case'updateTeacher':case'deleteTeacher':return adminWrite_(a,d);
+    case'uploadEvidence':return uploadEvidence_(d);
+
+    // CRITICAL: evaluation form writes to Supervision + SupervisionDetails.
+    case'saveSupervisionData':
+    case'addEvaluation':return saveSupervision_(d);
+    case'updateSupervisionStatus':return reviewSupervision_(d);
+    case'updateEvaluation':return reviewSupervision_(d);
+    case'deleteEvaluation':return adminDelete_(d,'Supervision');
+
+    case'addUser':case'updateUser':case'deleteUser':
+    case'addTeacher':case'updateTeacher':case'deleteTeacher':return adminWrite_(d);
     default:return{success:false,error:'Unknown POST action: '+a};
   }
 }
@@ -49,7 +56,7 @@ function routePost_(d){
 function getFilesForRequest_(){
   try{
     const setup=setup_();
-    const r=getSheetObjects_('Files',fileHeaders_());
+    const r=list_('Files');
     if(!r.success)return r;
     const data=(r.data||[]).map(function(f){
       return {id:f.id||'',timestamp:f.timestamp||'',teacherName:f.teacherName||'',fileType:f.fileType||'',fileUrl:f.fileUrl||'',driveFileId:f.driveFileId||'',fileName:f.fileName||'',status:f.status||'รอตรวจสอบ'};
@@ -62,14 +69,17 @@ function updateFileStatusDirect_(d){
   const id=String(d.id||'').trim();
   const status=String(d.status||'รอตรวจสอบ').trim();
   if(!id)return{success:false,error:'ไม่พบ ID ไฟล์'};
-  const sh=ensureSheet_('Files',fileHeaders_());
+  const sh=ensure_('Files',H.Files);
   const rows=sh.getLastRow();
   if(rows<2)return{success:false,error:'ยังไม่มีข้อมูลใน Files'};
-  const values=sh.getRange(2,1,rows-1,sh.getLastColumn()).getValues();
-  const idCol=fileHeaders_().indexOf('ID');
-  const statusCol=fileHeaders_().indexOf('Status');
+  const values=sh.getRange(2,1,rows-1,H.Files.length).getValues();
+  const idCol=H.Files.indexOf('ID');
+  const statusCol=H.Files.indexOf('Status');
   for(var i=0;i<values.length;i++){
-    if(String(values[i][idCol])===id){sh.getRange(i+2,statusCol+1).setValue(status);return{success:true,id:id,status:status};}
+    if(String(values[i][idCol])===id){
+      sh.getRange(i+2,statusCol+1).setValue(status);
+      return{success:true,id:id,status:status};
+    }
   }
   return{success:false,error:'ไม่พบไฟล์ ID: '+id};
 }
@@ -77,8 +87,7 @@ function updateFileStatusDirect_(d){
 function updateFileDirect_(d){
   const id=String(d.id||'').trim();
   if(!id)return{success:false,error:'ไม่พบ ID ไฟล์'};
-  const sh=ensureSheet_('Files',fileHeaders_());
-  const headers=fileHeaders_(),rows=sh.getLastRow();
+  const sh=ensure_('Files',H.Files),headers=H.Files,rows=sh.getLastRow();
   if(rows<2)return{success:false,error:'ยังไม่มีข้อมูลใน Files'};
   const values=sh.getRange(2,1,rows-1,headers.length).getValues(),idCol=headers.indexOf('ID');
   for(var i=0;i<values.length;i++){
@@ -94,13 +103,12 @@ function updateFileDirect_(d){
 function deleteFileDirect_(d){
   const id=String(d.id||'').trim();
   if(!id)return{success:false,error:'ไม่พบ ID ไฟล์'};
-  const sh=ensureSheet_('Files',fileHeaders_()),headers=fileHeaders_(),rows=sh.getLastRow();
+  const sh=ensure_('Files',H.Files),headers=H.Files,rows=sh.getLastRow();
   if(rows<2)return{success:false,error:'ยังไม่มีข้อมูลใน Files'};
   const values=sh.getRange(2,1,rows-1,headers.length).getValues(),idCol=headers.indexOf('ID'),driveCol=headers.indexOf('Drive File ID');
   for(var i=0;i<values.length;i++){
     if(String(values[i][idCol])!==id)continue;
     const driveId=String(values[i][driveCol]||'');
-    /* Delete the Drive file only when explicitly requested; default removes the database row. */
     if(String(d.deleteDriveFile||'').toLowerCase()==='true' && driveId){try{DriveApp.getFileById(driveId).setTrashed(true);}catch(_){}}
     sh.deleteRow(i+2);
     return{success:true,id:id};
@@ -110,8 +118,8 @@ function deleteFileDirect_(d){
 
 function getTeachersForRequest_(token){
   const setup=setup_();
-  const r=getSheetObjects_('Teachers',teacherHeaders_());
+  const r=list_('Teachers');
   if(!r.success)return r;
-  const auth=token?requireAdmin_(token):{ok:false};
-  return{success:true,data:auth.ok?(r.data||[]):(r.data||[]).filter(x=>String(x.active).toLowerCase()!=='false'),sheets:setup.sheets};
+  const auth=token?auth_(token,true):{ok:false};
+  return{success:true,data:auth.ok?(r.data||[]):(r.data||[]).filter(function(x){return String(x.active).toLowerCase()!=='false';}),sheets:setup.sheets};
 }
